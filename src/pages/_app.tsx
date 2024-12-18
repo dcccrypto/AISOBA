@@ -14,7 +14,7 @@ export default function App({ Component, pageProps }: AppProps) {
   const network = WalletAdapterNetwork.Mainnet
   const endpoint = useMemo(() => {
     // Use a single reliable RPC endpoint
-    return 'https://api.mainnet-beta.solana.com';
+    return 'https://mainnet.helius-rpc.com/?api-key=e568033d-06d6-49d1-ba90-b3564c91851b';
   }, []);
   
   const wallets = useMemo(
