@@ -25,42 +25,47 @@ export default function TokenCheck({ requiredAmount, onVerification }: TokenChec
     setError(null);
 
     try {
-      const retryCount = 3;
-      let lastError;
+      const tokenAccount = await getAssociatedTokenAddress(
+        TOKEN_MINT_ADDRESS,
+        publicKey,
+        false // allowOwnerOffCurve = false
+      );
 
-      for (let i = 0; i < retryCount; i++) {
-        try {
-          const tokenAccount = await getAssociatedTokenAddress(
-            TOKEN_MINT_ADDRESS,
-            publicKey
-          );
+      try {
+        // Get the token account info with proper commitment
+        const accountInfo = await connection.getAccountInfo(
+          tokenAccount,
+          'confirmed'
+        );
 
-          const account = await getAccount(connection, tokenAccount);
-          const balance = Number(account.amount) / Math.pow(10, TOKEN_DECIMALS);
-          setTokenBalance(balance);
-          
-          const hasEnoughTokens = balance >= requiredAmount;
-          onVerification(hasEnoughTokens);
-          
-          if (!hasEnoughTokens) {
-            setError(`Insufficient token balance. You need at least ${requiredAmount} tokens.`);
-          }
+        if (!accountInfo) {
+          setTokenBalance(0);
+          onVerification(false);
+          setError(`No tokens found. You need at least ${requiredAmount} tokens.`);
           return;
-        } catch (e: any) {
-          lastError = e;
-          if (e.message?.includes('could not find account')) {
-            setTokenBalance(0);
-            onVerification(false);
-            setError(`No tokens found. You need at least ${requiredAmount} tokens.`);
-            return;
-          }
-          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+
+        // Parse the account data
+        const account = await getAccount(connection, tokenAccount);
+        const balance = Number(account.amount) / Math.pow(10, TOKEN_DECIMALS);
+        setTokenBalance(balance);
+        
+        const hasEnoughTokens = balance >= requiredAmount;
+        onVerification(hasEnoughTokens);
+        
+        if (!hasEnoughTokens) {
+          setError(`Insufficient token balance. You need at least ${requiredAmount} tokens.`);
+        }
+      } catch (e: any) {
+        console.error('Error getting account info:', e);
+        if (e.message?.includes('could not find account')) {
+          setTokenBalance(0);
+          onVerification(false);
+          setError(`No tokens found. You need at least ${requiredAmount} tokens.`);
+        } else {
+          throw e;
         }
       }
-      
-      console.error('Error checking token balance:', lastError);
-      setError('Network error. Please try again.');
-      onVerification(false);
     } catch (error) {
       console.error('Error checking token balance:', error);
       setError('Error checking token balance. Please try again.');
