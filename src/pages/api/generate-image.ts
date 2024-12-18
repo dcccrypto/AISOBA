@@ -1,11 +1,32 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { PrismaClient } from '@prisma/client';
 import Replicate from 'replicate';
+import { ReplicatePrediction, ReplicateError } from '../../types/replicate';
 
 const prisma = new PrismaClient();
 const replicate = new Replicate({
   auth: process.env.REPLICATE_API_TOKEN,
 });
+
+export const config = {
+  api: {
+    bodyParser: true,
+    responseLimit: false,
+    externalResolver: true,
+  },
+};
+
+// Type guard for ReplicatePrediction
+function isReplicatePrediction(obj: any): obj is ReplicatePrediction {
+  return (
+    obj &&
+    typeof obj === 'object' &&
+    'id' in obj &&
+    'status' in obj &&
+    typeof obj.status === 'string' &&
+    ['starting', 'processing', 'succeeded', 'failed', 'canceled'].includes(obj.status)
+  );
+}
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -23,7 +44,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ message: 'Wallet address is required' });
     }
 
-    // Get user
     const user = await prisma.user.findUnique({
       where: { wallet },
     });
@@ -33,51 +53,72 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     try {
-      // Generate image using Replicate API
-      const prediction = await replicate.predictions.create({
-        version: "e0e293b97de2af9d7ad1851c13b14e01036fa7040b6dd39eec05d18f76dcc997",
-        input: {
-          prompt: prompt,
-          model: "dev",
-          go_fast: false,
-          lora_scale: 1,
-          megapixels: "1",
-          num_outputs: 1,
-          aspect_ratio: "1:1",
-          output_format: "webp",
-          guidance_scale: 3,
-          output_quality: 80,
-          prompt_strength: 0.8,
-          extra_lora_scale: 1,
-          num_inference_steps: 28
-        }
-      });
+      const prediction = await Promise.race([
+        replicate.predictions.create({
+          version: "e0e293b97de2af9d7ad1851c13b14e01036fa7040b6dd39eec05d18f76dcc997",
+          input: {
+            prompt: prompt,
+            model: "dev",
+            go_fast: true,
+            lora_scale: 1,
+            megapixels: "1",
+            num_outputs: 1,
+            aspect_ratio: "1:1",
+            output_format: "webp",
+            guidance_scale: 3,
+            output_quality: 80,
+            prompt_strength: 0.8,
+            extra_lora_scale: 1,
+            num_inference_steps: 20
+          }
+        }) as Promise<ReplicatePrediction>,
+        new Promise<never>((_, reject) => 
+          setTimeout(() => reject(new Error('Initial request timeout')), 10000)
+        )
+      ]);
 
-      // Wait for the prediction to complete
-      let imageUrl = null;
+      if (!isReplicatePrediction(prediction)) {
+        throw new Error('Invalid prediction response');
+      }
+
+      let imageUrl: string | null = null;
       let attempts = 0;
-      const maxAttempts = 30; // 30 seconds timeout
+      const maxAttempts = 60;
+      const pollInterval = 2000;
 
       while (!imageUrl && attempts < maxAttempts) {
-        const result = await replicate.predictions.get(prediction.id);
-        if (result.status === 'succeeded') {
-          imageUrl = result.output[0];
-          break;
-        } else if (result.status === 'failed') {
-          const errorMessage = typeof result.error === 'string' 
-            ? result.error 
-            : 'Image generation failed';
-          throw new Error(errorMessage);
+        try {
+          const result = await Promise.race([
+            replicate.predictions.get(prediction.id) as Promise<ReplicatePrediction>,
+            new Promise<never>((_, reject) => 
+              setTimeout(() => reject(new Error('Poll request timeout')), 5000)
+            )
+          ]);
+
+          if (!isReplicatePrediction(result)) {
+            throw new Error('Invalid polling response');
+          }
+
+          if (result.status === 'succeeded' && Array.isArray(result.output) && result.output.length > 0) {
+            imageUrl = result.output[0];
+            break;
+          } else if (result.status === 'failed') {
+            throw new Error(result.error || 'Image generation failed');
+          } else if (result.status === 'canceled') {
+            throw new Error('Image generation was canceled');
+          }
+        } catch (pollError) {
+          console.error('Polling error:', pollError);
         }
+
         attempts++;
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        await new Promise(resolve => setTimeout(resolve, pollInterval));
       }
 
       if (!imageUrl) {
-        throw new Error('Image generation timed out');
+        throw new Error('Image generation timed out after 60 seconds');
       }
 
-      // Store generation record
       await prisma.imageGeneration.create({
         data: {
           userId: user.id,
@@ -89,14 +130,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(200).json({ imageUrl });
     } catch (apiError) {
       console.error('Replicate API Error:', apiError);
+      const errorMessage = apiError instanceof Error ? apiError.message : 'Unknown API error';
       return res.status(500).json({ 
-        message: apiError instanceof Error ? apiError.message : 'Error generating image'
+        message: 'Failed to generate image. Please try again.',
+        error: errorMessage
       });
     }
   } catch (error) {
     console.error('Server Error:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown server error';
     return res.status(500).json({ 
-      message: error instanceof Error ? error.message : 'Server error'
+      message: 'Server error. Please try again later.',
+      error: errorMessage
     });
   } finally {
     await prisma.$disconnect();
