@@ -31,17 +31,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     try {
       // Generate image using Replicate API
       const prediction = await replicate.predictions.create({
-        version: "39ed52f2a78e934b3ba6e2a89f5b1c712de7dfea535525255b1aa35c5565e08b",
+        version: "dcccrypto/soba:e0e293b97de2af9d7ad1851c13b14e01036fa7040b6dd39eec05d18f76dcc997",
         input: {
-          prompt: prompt,
-          negative_prompt: "low quality, bad anatomy, blurry",
-          width: 1024,
-          height: 1024,
+          model: "dev",
+          go_fast: false,
+          lora_scale: 1,
+          megapixels: "1",
           num_outputs: 1,
-          scheduler: "K_EULER",
-          num_inference_steps: 50,
-          guidance_scale: 7.5,
+          aspect_ratio: "1:1",
+          output_format: "webp",
+          guidance_scale: 3,
+          output_quality: 80,
           prompt_strength: 0.8,
+          extra_lora_scale: 1,
+          num_inference_steps: 28
         }
       });
 

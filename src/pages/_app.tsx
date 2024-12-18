@@ -10,8 +10,8 @@ import { useMemo } from 'react'
 require('@solana/wallet-adapter-react-ui/styles.css')
 
 export default function App({ Component, pageProps }: AppProps) {
-  // Set to 'mainnet-beta' for production
-  const network = WalletAdapterNetwork.Devnet
+  // Changed to correct enum value
+  const network = WalletAdapterNetwork.Mainnet
   const endpoint = useMemo(() => clusterApiUrl(network), [network])
   
   const wallets = useMemo(

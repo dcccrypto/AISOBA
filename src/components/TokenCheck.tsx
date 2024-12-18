@@ -1,19 +1,24 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useWallet, useConnection } from '@solana/wallet-adapter-react';
 import { PublicKey } from '@solana/web3.js';
 import { TOKEN_PROGRAM_ID, getAccount, getAssociatedTokenAddress } from '@solana/spl-token';
+import { Connection } from '@solana/web3.js';
 
 interface TokenCheckProps {
   requiredAmount: number;
   onVerification: (hasEnough: boolean) => void;
 }
 
-// SPL Token mint address
-const TOKEN_MINT_ADDRESS = new PublicKey('11111111111111111111111111111111');
+// Update token mint address to the actual mainnet token
+const TOKEN_MINT_ADDRESS = new PublicKey('25p2BoNp6qrJH5As6ek6H7Ei495oSkyZd3tGb97sqFmH');
+
+// Add mainnet RPC endpoint
+const MAINNET_RPC = 'https://api.mainnet-beta.solana.com';
 
 export default function TokenCheck({ requiredAmount, onVerification }: TokenCheckProps) {
   const { publicKey } = useWallet();
-  const { connection } = useConnection();
+  // Use mainnet connection
+  const connection = useMemo(() => new Connection(MAINNET_RPC), []);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [tokenBalance, setTokenBalance] = useState<number | null>(null);
