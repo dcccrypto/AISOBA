@@ -8,16 +8,67 @@ interface TokenCheckProps {
   onVerification: (hasEnough: boolean) => void;
 }
 
-// Update token mint address to the actual mainnet token
 const TOKEN_MINT_ADDRESS = new PublicKey('25p2BoNp6qrJH5As6ek6H7Ei495oSkyZd3tGb97sqFmH');
-const TOKEN_DECIMALS = 6; // Add decimals constant
+const TOKEN_DECIMALS = 6;
 
 export default function TokenCheck({ requiredAmount, onVerification }: TokenCheckProps) {
   const { publicKey } = useWallet();
-  const { connection } = useConnection(); // Use connection from context
+  const { connection } = useConnection();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [tokenBalance, setTokenBalance] = useState<number | null>(null);
+
+  const checkTokenBalance = async () => {
+    if (!publicKey) return;
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const retryCount = 3;
+      let lastError;
+
+      for (let i = 0; i < retryCount; i++) {
+        try {
+          const tokenAccount = await getAssociatedTokenAddress(
+            TOKEN_MINT_ADDRESS,
+            publicKey
+          );
+
+          const account = await getAccount(connection, tokenAccount);
+          const balance = Number(account.amount) / Math.pow(10, TOKEN_DECIMALS);
+          setTokenBalance(balance);
+          
+          const hasEnoughTokens = balance >= requiredAmount;
+          onVerification(hasEnoughTokens);
+          
+          if (!hasEnoughTokens) {
+            setError(`Insufficient token balance. You need at least ${requiredAmount} tokens.`);
+          }
+          return;
+        } catch (e: any) {
+          lastError = e;
+          if (e.message?.includes('could not find account')) {
+            setTokenBalance(0);
+            onVerification(false);
+            setError(`No tokens found. You need at least ${requiredAmount} tokens.`);
+            return;
+          }
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+      }
+      
+      console.error('Error checking token balance:', lastError);
+      setError('Network error. Please try again.');
+      onVerification(false);
+    } catch (error) {
+      console.error('Error checking token balance:', error);
+      setError('Error checking token balance. Please try again.');
+      onVerification(false);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (publicKey) {
@@ -28,43 +79,6 @@ export default function TokenCheck({ requiredAmount, onVerification }: TokenChec
       setError(null);
     }
   }, [publicKey]);
-
-  const checkTokenBalance = async () => {
-    if (!publicKey) return;
-
-    setLoading(true);
-    setError(null);
-
-    try {
-      const tokenAccount = await getAssociatedTokenAddress(
-        TOKEN_MINT_ADDRESS,
-        publicKey
-      );
-
-      try {
-        const account = await getAccount(connection, tokenAccount);
-        const balance = Number(account.amount) / Math.pow(10, TOKEN_DECIMALS);
-        setTokenBalance(balance);
-        
-        const hasEnoughTokens = balance >= requiredAmount;
-        onVerification(hasEnoughTokens);
-        
-        if (!hasEnoughTokens) {
-          setError(`Insufficient token balance. You need at least ${requiredAmount} tokens.`);
-        }
-      } catch (e) {
-        setTokenBalance(0);
-        onVerification(false);
-        setError(`No tokens found. You need at least ${requiredAmount} tokens.`);
-      }
-    } catch (error) {
-      console.error('Error checking token balance:', error);
-      setError('Error checking token balance. Please try again.');
-      onVerification(false);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   return (
     <div className="mb-8 p-4 border rounded-lg bg-white shadow-sm">
