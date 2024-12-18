@@ -18,9 +18,19 @@ export default function AIImageGenerator({ onImageGenerated }: AIImageGeneratorP
     try {
       const response = await fetch('/api/check-generation-limit', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        credentials: 'same-origin',
         body: JSON.stringify({ wallet: publicKey.toString() }),
       });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Response error:', response.status, errorText);
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
       
       const result = await response.json();
       if (!result.success) {
@@ -32,6 +42,7 @@ export default function AIImageGenerator({ onImageGenerated }: AIImageGeneratorP
     } catch (error) {
       console.error('Error checking generation limit:', error);
       setError('Error checking generation limit');
+      return null;
     }
   };
 
