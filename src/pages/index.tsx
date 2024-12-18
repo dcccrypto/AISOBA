@@ -16,31 +16,42 @@ export default function Home() {
   const [generatedImage, setGeneratedImage] = useState<string | null>(null);
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <h1 className="text-4xl font-bold mb-8">AI NFT Creator</h1>
-      
-      <div className="mb-8">
-        <WalletMultiButtonDynamic />
-      </div>
+    <div className="min-h-screen bg-gradient-to-b from-[#1a1a1a] to-[#2a2a2a]">
+      <div className="responsive-container py-12">
+        <div className="text-center mb-12 animate-fadeIn">
+          <h1 className="text-4xl md:text-6xl font-bold mb-4 text-transparent bg-clip-text bg-gradient-to-r from-[#ff6b00] to-[#ff8533]">
+            AI NFT Creator
+          </h1>
+          <p className="text-lg text-gray-400 max-w-2xl mx-auto">
+            Create unique NFTs powered by artificial intelligence
+          </p>
+        </div>
+        
+        <div className="flex justify-center mb-12">
+          <WalletMultiButtonDynamic className="!px-6 !py-3 !rounded-lg !text-lg" />
+        </div>
 
-      <TokenCheck 
-        requiredAmount={10}
-        onVerification={setHasEnoughTokens}
-      />
-
-      {hasEnoughTokens && (
-        <>
-          <AIImageGenerator
-            onImageGenerated={setGeneratedImage}
+        <div className="max-w-4xl mx-auto space-y-8">
+          <TokenCheck 
+            requiredAmount={10}
+            onVerification={setHasEnoughTokens}
           />
-          
-          {generatedImage && (
-            <NFTMinter
-              imageUrl={generatedImage}
-            />
+
+          {hasEnoughTokens && (
+            <div className="space-y-8 animate-fadeIn">
+              <AIImageGenerator
+                onImageGenerated={setGeneratedImage}
+              />
+              
+              {generatedImage && (
+                <NFTMinter
+                  imageUrl={generatedImage}
+                />
+              )}
+            </div>
           )}
-        </>
-      )}
+        </div>
+      </div>
     </div>
   );
 } 

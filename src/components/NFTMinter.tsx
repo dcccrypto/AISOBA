@@ -211,25 +211,58 @@ export default function NFTMinter({ imageUrl }: NFTMinterProps) {
   };
 
   return (
-    <div className="mb-8">
-      <h2 className="text-2xl mb-4">Mint as NFT</h2>
-      <div className="mb-4">
-        <img 
-          src={imageUrl} 
-          alt="Generated artwork" 
-          className="max-w-sm rounded shadow-lg"
-        />
+    <div className="card hover:shadow-orange-500/20">
+      <div className="flex flex-col space-y-6">
+        <h2 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-[#ff6b00] to-[#ff8533]">
+          Mint as NFT
+        </h2>
+
+        <div className="relative group">
+          <div className="image-preview overflow-hidden">
+            <img 
+              src={imageUrl} 
+              alt="Generated artwork" 
+              className="w-full h-auto rounded-lg transform transition-transform duration-300 group-hover:scale-105"
+            />
+          </div>
+          <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-lg flex items-end justify-center p-4">
+            <p className="text-white text-sm">Your generated masterpiece</p>
+          </div>
+        </div>
+
+        {error && (
+          <div className="p-4 rounded-lg bg-red-500/10 border border-red-500/20">
+            <p className="text-red-500 text-sm flex items-center">
+              <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+              </svg>
+              {error}
+            </p>
+          </div>
+        )}
+
+        <button
+          className="btn-primary group"
+          onClick={mintNFT}
+          disabled={minting || !publicKey}
+        >
+          <span className="flex items-center justify-center">
+            {minting ? (
+              <>
+                <div className="loading-spinner mr-2" />
+                Minting...
+              </>
+            ) : (
+              <>
+                <svg className="w-5 h-5 mr-2 group-hover:animate-pulse" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M4 5a2 2 0 00-2 2v8a2 2 0 002 2h12a2 2 0 002-2V7a2 2 0 00-2-2h-1.586a1 1 0 01-.707-.293l-1.121-1.121A2 2 0 0011.172 3H8.828a2 2 0 00-1.414.586L6.293 4.707A1 1 0 015.586 5H4zm6 9a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" />
+                </svg>
+                Mint NFT
+              </>
+            )}
+          </span>
+        </button>
       </div>
-      {error && (
-        <p className="text-red-500 text-sm mt-2">{error}</p>
-      )}
-      <button
-        className="mt-4 px-4 py-2 bg-green-500 text-white rounded disabled:bg-gray-400"
-        onClick={mintNFT}
-        disabled={minting || !publicKey}
-      >
-        {minting ? 'Minting...' : 'Mint NFT'}
-      </button>
     </div>
   );
 } 

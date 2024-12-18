@@ -1,3 +1,4 @@
+import '../styles/globals.css';
 import type { AppProps } from 'next/app'
 import { WalletAdapterNetwork } from '@solana/wallet-adapter-base'
 import { PhantomWalletAdapter } from '@solana/wallet-adapter-wallets'
