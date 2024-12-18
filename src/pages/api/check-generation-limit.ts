@@ -6,10 +6,20 @@ const prisma = new PrismaClient();
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
-    return res.status(405).json({ message: 'Method not allowed' });
+    return res.status(405).json({ 
+      success: false,
+      message: 'Method not allowed' 
+    });
   }
 
   const { wallet } = req.body;
+
+  if (!wallet) {
+    return res.status(400).json({
+      success: false,
+      message: 'Wallet address is required'
+    });
+  }
 
   try {
     // Get or create user
@@ -38,12 +48,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const canGenerate = remainingGenerations > 0;
 
     return res.status(200).json({
-      canGenerate,
-      remainingGenerations,
-      userId: user.id,
+      success: true,
+      data: {
+        canGenerate,
+        remainingGenerations,
+        userId: user.id,
+      }
     });
   } catch (error) {
     console.error('Error checking generation limit:', error);
-    return res.status(500).json({ message: 'Error checking generation limit' });
+    return res.status(500).json({ 
+      success: false,
+      message: 'Error checking generation limit',
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+  } finally {
+    // Ensure Prisma connection is closed
+    await prisma.$disconnect();
   }
 } 

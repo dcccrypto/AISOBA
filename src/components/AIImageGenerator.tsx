@@ -22,9 +22,13 @@ export default function AIImageGenerator({ onImageGenerated }: AIImageGeneratorP
         body: JSON.stringify({ wallet: publicKey.toString() }),
       });
       
-      const data = await response.json();
-      setRemainingGenerations(data.remainingGenerations);
-      return data;
+      const result = await response.json();
+      if (!result.success) {
+        throw new Error(result.message);
+      }
+      
+      setRemainingGenerations(result.data.remainingGenerations);
+      return result.data;
     } catch (error) {
       console.error('Error checking generation limit:', error);
       setError('Error checking generation limit');
