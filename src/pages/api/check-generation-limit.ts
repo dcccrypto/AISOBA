@@ -1,39 +1,43 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { PrismaClient } from '@prisma/client';
 import { startOfDay, endOfDay } from 'date-fns';
-import Cors from 'cors';
 
-const prisma = new PrismaClient();
+// Create a single PrismaClient instance
+let prisma: PrismaClient;
 
-// Initialize CORS middleware
-const cors = Cors({
-  methods: ['POST', 'OPTIONS'],
-  origin: '*',
-  credentials: true,
-});
-
-// Helper method to run middleware
-function runMiddleware(req: NextApiRequest, res: NextApiResponse, fn: Function) {
-  return new Promise((resolve, reject) => {
-    fn(req, res, (result: any) => {
-      if (result instanceof Error) {
-        return reject(result);
-      }
-      return resolve(result);
-    });
-  });
+if (process.env.NODE_ENV === 'production') {
+  prisma = new PrismaClient();
+} else {
+  // @ts-ignore
+  if (!global.prisma) {
+    // @ts-ignore
+    global.prisma = new PrismaClient();
+  }
+  // @ts-ignore
+  prisma = global.prisma;
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  // Run the CORS middleware
-  await runMiddleware(req, res, cors);
+  // Handle preflight request
+  if (req.method === 'OPTIONS') {
+    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    return res.status(200).end();
+  }
 
+  // Only allow POST requests
   if (req.method !== 'POST') {
     return res.status(405).json({ 
       success: false,
       message: 'Method not allowed' 
     });
   }
+
+  // Set CORS headers for the actual request
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
   const { wallet } = req.body;
 
@@ -45,6 +49,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
+    // Test database connection
+    await prisma.$connect();
+    
     // Get or create user
     let user = await prisma.user.findUnique({
       where: { wallet },
@@ -79,13 +86,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     });
   } catch (error) {
-    console.error('Error checking generation limit:', error);
+    console.error('Database Error:', error);
     return res.status(500).json({ 
       success: false,
-      message: 'Error checking generation limit',
+      message: 'Database connection error',
       error: error instanceof Error ? error.message : 'Unknown error'
     });
   } finally {
-    await prisma.$disconnect();
+    try {
+      await prisma.$disconnect();
+    } catch (e) {
+      console.error('Error disconnecting from database:', e);
+    }
   }
 } 
