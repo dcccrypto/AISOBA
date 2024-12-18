@@ -62,16 +62,21 @@ export default function AIImageGenerator({ onImageGenerated }: AIImageGeneratorP
         }),
       });
       
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to generate image');
+      }
+      
       const data = await response.json();
       if (data.imageUrl) {
         onImageGenerated(data.imageUrl);
         await checkGenerationLimit(); // Update remaining generations
       } else {
-        setError('Failed to generate image');
+        throw new Error('No image URL in response');
       }
     } catch (error) {
       console.error('Error generating image:', error);
-      setError('Error generating image');
+      setError(error instanceof Error ? error.message : 'Error generating image');
     } finally {
       setGenerating(false);
     }

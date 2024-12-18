@@ -3,6 +3,13 @@ import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import TokenCheck from '../components/TokenCheck';
 import AIImageGenerator from '../components/AIImageGenerator';
 import NFTMinter from '../components/NFTMinter';
+import dynamic from 'next/dynamic';
+
+// Dynamically import WalletMultiButton to avoid SSR issues
+const WalletMultiButtonDynamic = dynamic(
+  () => import('@solana/wallet-adapter-react-ui').then((mod) => mod.WalletMultiButton),
+  { ssr: false }
+);
 
 export default function Home() {
   const [hasEnoughTokens, setHasEnoughTokens] = useState(false);
@@ -13,7 +20,7 @@ export default function Home() {
       <h1 className="text-4xl font-bold mb-8">AI NFT Creator</h1>
       
       <div className="mb-8">
-        <WalletMultiButton />
+        <WalletMultiButtonDynamic />
       </div>
 
       <TokenCheck 

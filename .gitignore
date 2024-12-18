@@ -1,0 +1,11 @@
+.env
+.DS_Store
+.env
+.env.local
+.env.production
+.env.test
+.env.development
+node_modules
+package-lock.json
+prisma
+.next
