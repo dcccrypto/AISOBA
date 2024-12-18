@@ -1,8 +1,7 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { useWallet, useConnection } from '@solana/wallet-adapter-react';
 import { PublicKey } from '@solana/web3.js';
 import { TOKEN_PROGRAM_ID, getAccount, getAssociatedTokenAddress } from '@solana/spl-token';
-import { Connection } from '@solana/web3.js';
 
 interface TokenCheckProps {
   requiredAmount: number;
@@ -13,13 +12,9 @@ interface TokenCheckProps {
 const TOKEN_MINT_ADDRESS = new PublicKey('25p2BoNp6qrJH5As6ek6H7Ei495oSkyZd3tGb97sqFmH');
 const TOKEN_DECIMALS = 6; // Add decimals constant
 
-// Add mainnet RPC endpoint
-const MAINNET_RPC = 'https://api.mainnet-beta.solana.com';
-
 export default function TokenCheck({ requiredAmount, onVerification }: TokenCheckProps) {
   const { publicKey } = useWallet();
-  // Use mainnet connection
-  const connection = useMemo(() => new Connection(MAINNET_RPC), []);
+  const { connection } = useConnection(); // Use connection from context
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [tokenBalance, setTokenBalance] = useState<number | null>(null);
@@ -41,21 +36,16 @@ export default function TokenCheck({ requiredAmount, onVerification }: TokenChec
     setError(null);
 
     try {
-      // Get the associated token account address
       const tokenAccount = await getAssociatedTokenAddress(
         TOKEN_MINT_ADDRESS,
         publicKey
       );
 
       try {
-        // Get the token account info
         const account = await getAccount(connection, tokenAccount);
-        
-        // Convert amount considering decimals
         const balance = Number(account.amount) / Math.pow(10, TOKEN_DECIMALS);
         setTokenBalance(balance);
         
-        // Verify if balance meets requirement
         const hasEnoughTokens = balance >= requiredAmount;
         onVerification(hasEnoughTokens);
         
@@ -63,7 +53,6 @@ export default function TokenCheck({ requiredAmount, onVerification }: TokenChec
           setError(`Insufficient token balance. You need at least ${requiredAmount} tokens.`);
         }
       } catch (e) {
-        // Token account doesn't exist, meaning they have 0 tokens
         setTokenBalance(0);
         onVerification(false);
         setError(`No tokens found. You need at least ${requiredAmount} tokens.`);
