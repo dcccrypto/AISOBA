@@ -20,7 +20,9 @@ export default function AIImageGenerator({ onImageGenerated }: AIImageGeneratorP
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
+          'Accept': 'application/json',
         },
+        mode: 'cors',
         body: JSON.stringify({ wallet: publicKey.toString() }),
       });
       
@@ -56,6 +58,11 @@ export default function AIImageGenerator({ onImageGenerated }: AIImageGeneratorP
       return;
     }
 
+    if (!prompt.trim()) {
+      setError('Please enter a prompt');
+      return;
+    }
+
     const limitCheck = await checkGenerationLimit();
     if (!limitCheck?.canGenerate) {
       setError('Daily generation limit reached. Please try again tomorrow.');
@@ -68,9 +75,12 @@ export default function AIImageGenerator({ onImageGenerated }: AIImageGeneratorP
     try {
       const response = await fetch('/api/generate-image', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
         body: JSON.stringify({
-          prompt,
+          prompt: prompt.trim(),
           wallet: publicKey.toString(),
         }),
       });

@@ -31,8 +31,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     try {
       // Generate image using Replicate API
       const prediction = await replicate.predictions.create({
-        version: "dcccrypto/soba:e0e293b97de2af9d7ad1851c13b14e01036fa7040b6dd39eec05d18f76dcc997",
+        version: "e0e293b97de2af9d7ad1851c13b14e01036fa7040b6dd39eec05d18f76dcc997",
         input: {
+          prompt: prompt,
           model: "dev",
           go_fast: false,
           lora_scale: 1,
@@ -84,5 +85,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       message: 'Server error',
       error: error instanceof Error ? error.message : 'Unknown error'
     });
+  } finally {
+    await prisma.$disconnect();
   }
 } 

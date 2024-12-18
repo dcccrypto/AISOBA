@@ -1,10 +1,33 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { PrismaClient } from '@prisma/client';
 import { startOfDay, endOfDay } from 'date-fns';
+import Cors from 'cors';
 
 const prisma = new PrismaClient();
 
+// Initialize CORS middleware
+const cors = Cors({
+  methods: ['POST', 'OPTIONS'],
+  origin: '*',
+  credentials: true,
+});
+
+// Helper method to run middleware
+function runMiddleware(req: NextApiRequest, res: NextApiResponse, fn: Function) {
+  return new Promise((resolve, reject) => {
+    fn(req, res, (result: any) => {
+      if (result instanceof Error) {
+        return reject(result);
+      }
+      return resolve(result);
+    });
+  });
+}
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  // Run the CORS middleware
+  await runMiddleware(req, res, cors);
+
   if (req.method !== 'POST') {
     return res.status(405).json({ 
       success: false,
@@ -63,7 +86,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       error: error instanceof Error ? error.message : 'Unknown error'
     });
   } finally {
-    // Ensure Prisma connection is closed
     await prisma.$disconnect();
   }
 } 
