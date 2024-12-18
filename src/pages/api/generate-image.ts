@@ -64,7 +64,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           imageUrl = result.output[0];
           break;
         } else if (result.status === 'failed') {
-          throw new Error(result.error || 'Image generation failed');
+          const errorMessage = typeof result.error === 'string' 
+            ? result.error 
+            : 'Image generation failed';
+          throw new Error(errorMessage);
         }
         attempts++;
         await new Promise(resolve => setTimeout(resolve, 1000));
