@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useWallet, useConnection } from '@solana/wallet-adapter-react';
-import { PublicKey } from '@solana/web3.js';
+import { PublicKey, Commitment } from '@solana/web3.js';
 import { TOKEN_PROGRAM_ID, getAccount, getAssociatedTokenAddress } from '@solana/spl-token';
 
 interface TokenCheckProps {
@@ -28,14 +28,14 @@ export default function TokenCheck({ requiredAmount, onVerification }: TokenChec
       const tokenAccount = await getAssociatedTokenAddress(
         TOKEN_MINT_ADDRESS,
         publicKey,
-        false // allowOwnerOffCurve = false
+        false
       );
 
       try {
-        // Get the token account info with proper commitment
+        // First check if account exists
         const accountInfo = await connection.getAccountInfo(
           tokenAccount,
-          'confirmed'
+          'confirmed' as Commitment
         );
 
         if (!accountInfo) {
@@ -45,26 +45,28 @@ export default function TokenCheck({ requiredAmount, onVerification }: TokenChec
           return;
         }
 
-        // Parse the account data
-        const account = await getAccount(connection, tokenAccount);
-        const balance = Number(account.amount) / Math.pow(10, TOKEN_DECIMALS);
-        setTokenBalance(balance);
-        
-        const hasEnoughTokens = balance >= requiredAmount;
-        onVerification(hasEnoughTokens);
-        
-        if (!hasEnoughTokens) {
-          setError(`Insufficient token balance. You need at least ${requiredAmount} tokens.`);
-        }
-      } catch (e: any) {
-        console.error('Error getting account info:', e);
-        if (e.message?.includes('could not find account')) {
-          setTokenBalance(0);
+        // Then get token account data
+        try {
+          const account = await getAccount(connection, tokenAccount);
+          const balance = Number(account.amount) / Math.pow(10, TOKEN_DECIMALS);
+          setTokenBalance(balance);
+          
+          const hasEnoughTokens = balance >= requiredAmount;
+          onVerification(hasEnoughTokens);
+          
+          if (!hasEnoughTokens) {
+            setError(`Insufficient token balance. You need at least ${requiredAmount} tokens.`);
+          }
+        } catch (tokenError) {
+          console.error('Error getting token account:', tokenError);
+          setError('Error retrieving token balance');
           onVerification(false);
-          setError(`No tokens found. You need at least ${requiredAmount} tokens.`);
-        } else {
-          throw e;
         }
+      } catch (accountError) {
+        console.error('Error getting account info:', accountError);
+        setTokenBalance(0);
+        onVerification(false);
+        setError(`No tokens found. You need at least ${requiredAmount} tokens.`);
       }
     } catch (error) {
       console.error('Error checking token balance:', error);
@@ -79,15 +81,15 @@ export default function TokenCheck({ requiredAmount, onVerification }: TokenChec
     if (publicKey) {
       checkTokenBalance();
     } else {
-      onVerification(false);
       setTokenBalance(null);
       setError(null);
+      onVerification(false);
     }
   }, [publicKey]);
 
   return (
-    <div className="mb-8 p-4 border rounded-lg bg-white shadow-sm">
-      <h2 className="text-2xl mb-4">Token Verification</h2>
+    <div className="mb-8 p-4 border rounded-lg">
+      <h2 className="text-xl font-bold mb-4">Token Verification</h2>
       
       {publicKey ? (
         <>
