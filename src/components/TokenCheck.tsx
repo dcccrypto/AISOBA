@@ -11,6 +11,7 @@ interface TokenCheckProps {
 
 // Update token mint address to the actual mainnet token
 const TOKEN_MINT_ADDRESS = new PublicKey('25p2BoNp6qrJH5As6ek6H7Ei495oSkyZd3tGb97sqFmH');
+const TOKEN_DECIMALS = 6; // Add decimals constant
 
 // Add mainnet RPC endpoint
 const MAINNET_RPC = 'https://api.mainnet-beta.solana.com';
@@ -50,8 +51,8 @@ export default function TokenCheck({ requiredAmount, onVerification }: TokenChec
         // Get the token account info
         const account = await getAccount(connection, tokenAccount);
         
-        // Convert amount to number (considering decimals if any)
-        const balance = Number(account.amount);
+        // Convert amount considering decimals
+        const balance = Number(account.amount) / Math.pow(10, TOKEN_DECIMALS);
         setTokenBalance(balance);
         
         // Verify if balance meets requirement
