@@ -19,6 +19,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ message: 'Prompt is required' });
     }
 
+    if (!wallet) {
+      return res.status(400).json({ message: 'Wallet address is required' });
+    }
+
     // Get user
     const user = await prisma.user.findUnique({
       where: { wallet },
@@ -51,15 +55,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       // Wait for the prediction to complete
       let imageUrl = null;
-      while (!imageUrl) {
+      let attempts = 0;
+      const maxAttempts = 30; // 30 seconds timeout
+
+      while (!imageUrl && attempts < maxAttempts) {
         const result = await replicate.predictions.get(prediction.id);
         if (result.status === 'succeeded') {
           imageUrl = result.output[0];
           break;
         } else if (result.status === 'failed') {
-          throw new Error('Image generation failed');
+          throw new Error(result.error || 'Image generation failed');
         }
+        attempts++;
         await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+
+      if (!imageUrl) {
+        throw new Error('Image generation timed out');
       }
 
       // Store generation record
@@ -75,15 +87,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     } catch (apiError) {
       console.error('Replicate API Error:', apiError);
       return res.status(500).json({ 
-        message: 'Error generating image',
-        error: apiError instanceof Error ? apiError.message : 'API Error'
+        message: apiError instanceof Error ? apiError.message : 'Error generating image'
       });
     }
   } catch (error) {
     console.error('Server Error:', error);
     return res.status(500).json({ 
-      message: 'Server error',
-      error: error instanceof Error ? error.message : 'Unknown error'
+      message: error instanceof Error ? error.message : 'Server error'
     });
   } finally {
     await prisma.$disconnect();

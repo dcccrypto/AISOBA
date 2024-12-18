@@ -85,12 +85,12 @@ export default function AIImageGenerator({ onImageGenerated }: AIImageGeneratorP
         }),
       });
       
+      const data = await response.json();
+      
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to generate image');
+        throw new Error(data.message || 'Failed to generate image');
       }
       
-      const data = await response.json();
       if (data.imageUrl) {
         onImageGenerated(data.imageUrl);
         await checkGenerationLimit(); // Update remaining generations
