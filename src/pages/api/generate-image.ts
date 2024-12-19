@@ -55,9 +55,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     try {
       const enhancedPrompt = `soba ape ${prompt.trim()}`;
 
-      const prediction = await Promise.race([
-        replicate.predictions.create({
-          version: "92c16aaef4850f7a1c918e03d9c7d6dd84d87ead418d5dd3afbc3b6e16f61af3",
+      const output = await replicate.run(
+        "dcccrypto/sdxl-soba:92c16aaef4850f7a1c918e03d9c7d6dd84d87ead418d5dd3afbc3b6e16f61af3",
+        {
           input: {
             prompt: enhancedPrompt,
             negative_prompt: "lowres, text, watermark, logo, signature, cropped, worst quality, low quality, jpeg artifacts, ugly, duplicate, morbid, mutilated, out of frame, extra fingers, mutated hands, poorly drawn hands, poorly drawn face, mutation, deformed, blurry, dehydrated, bad anatomy, bad proportions, extra limbs, cloned face, disfigured, gross proportions, malformed limbs, missing arms, missing legs, extra arms, extra legs, fused fingers, too many fingers, long neck",
@@ -70,55 +70,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             prompt_strength: 0.8,
             refine: "expert_ensemble_refiner",
             high_noise_frac: 0.8,
-            apply_watermark: false
+            apply_watermark: false,
+            lora_scale: 0.6
           }
-        }) as Promise<ReplicatePrediction>,
-        new Promise<never>((_, reject) => 
-          setTimeout(() => reject(new Error('Initial request timeout')), 10000)
-        )
-      ]);
-
-      if (!isReplicatePrediction(prediction)) {
-        throw new Error('Invalid prediction response');
-      }
-
-      let imageUrl: string | null = null;
-      let attempts = 0;
-      const maxAttempts = 60;
-      const pollInterval = 2000;
-
-      while (!imageUrl && attempts < maxAttempts) {
-        try {
-          const result = await Promise.race([
-            replicate.predictions.get(prediction.id) as Promise<ReplicatePrediction>,
-            new Promise<never>((_, reject) => 
-              setTimeout(() => reject(new Error('Poll request timeout')), 5000)
-            )
-          ]);
-
-          if (!isReplicatePrediction(result)) {
-            throw new Error('Invalid polling response');
-          }
-
-          if (result.status === 'succeeded' && Array.isArray(result.output) && result.output.length > 0) {
-            imageUrl = result.output[0];
-            break;
-          } else if (result.status === 'failed') {
-            throw new Error(result.error || 'Image generation failed');
-          } else if (result.status === 'canceled') {
-            throw new Error('Image generation was canceled');
-          }
-        } catch (pollError) {
-          console.error('Polling error:', pollError);
         }
+      );
 
-        attempts++;
-        await new Promise(resolve => setTimeout(resolve, pollInterval));
+      if (!output || !Array.isArray(output) || output.length === 0) {
+        throw new Error('No output received from image generation');
       }
 
-      if (!imageUrl) {
-        throw new Error('Image generation timed out after 60 seconds');
-      }
+      const imageUrl = output[0];
 
       await prisma.imageGeneration.create({
         data: {
