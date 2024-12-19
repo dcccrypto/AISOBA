@@ -53,7 +53,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     try {
-      const enhancedPrompt = `soba ape ${prompt.trim()}`;
+      const enhancedPrompt = `soba ${prompt.trim()}`;
       console.log('Starting image generation with prompt:', enhancedPrompt);
 
       // Create prediction using Replicate API
