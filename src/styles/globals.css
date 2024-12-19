@@ -32,20 +32,16 @@ body {
 
 /* Custom button styles */
 .btn-primary {
-  @apply px-4 py-2 bg-[#ff6b00] text-white rounded-lg 
-         hover:bg-[#ff8533] transition-all duration-300 
-         disabled:bg-gray-600 disabled:cursor-not-allowed
-         transform hover:scale-105 active:scale-95
-         shadow-lg hover:shadow-orange-500/50;
+  @apply px-4 py-2 rounded-lg bg-gradient-to-r from-[#ff6b00] to-[#ff8533] 
+  text-white hover:from-[#ff8533] hover:to-[#ff6b00] transition-all duration-300 
+  disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:from-[#ff6b00] 
+  disabled:hover:to-[#ff8533];
 }
 
 .btn-secondary {
-  @apply px-4 py-2 bg-transparent border-2 border-[#ff6b00] 
-         text-[#ff6b00] rounded-lg hover:bg-[#ff6b00] 
-         hover:text-white transition-all duration-300
-         disabled:opacity-50 disabled:cursor-not-allowed
-         transform hover:scale-105 active:scale-95
-         shadow-lg hover:shadow-orange-500/50;
+  @apply px-4 py-2 rounded-lg bg-gray-800 text-white hover:bg-gray-700 
+  transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed
+  border border-gray-700 hover:border-gray-600;
 }
 
 /* Custom input styles */
@@ -82,11 +78,17 @@ body {
 
 /* Image container */
 .image-preview {
-  @apply relative overflow-hidden rounded-lg
-         border-2 border-[#ff6b00]/20
-         transition-all duration-300
-         hover:border-[#ff6b00]
-         hover:shadow-lg hover:shadow-orange-500/30;
+  @apply relative bg-gray-800 rounded-lg overflow-hidden;
+  aspect-ratio: 1;
+}
+
+.image-preview img {
+  @apply object-cover w-full h-full;
+}
+
+.preview-badge {
+  @apply absolute top-2 right-2 bg-black/70 px-3 py-1 rounded-full 
+  text-xs text-white z-10;
 }
 
 /* Wallet button override */

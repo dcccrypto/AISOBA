@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
+import { saveAs } from 'file-saver';
 
 interface AIImageGeneratorProps {
   onImageGenerated: (imageUrl: string) => void;
@@ -11,6 +12,7 @@ export default function AIImageGenerator({ onImageGenerated }: AIImageGeneratorP
   const [generating, setGenerating] = useState(false);
   const [remainingGenerations, setRemainingGenerations] = useState(5);
   const [error, setError] = useState<string | null>(null);
+  const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
 
   const checkGenerationLimit = async () => {
     if (!publicKey) return;
@@ -51,6 +53,17 @@ export default function AIImageGenerator({ onImageGenerated }: AIImageGeneratorP
       checkGenerationLimit();
     }
   }, [publicKey]);
+
+  const handleDownload = async (url: string) => {
+    try {
+      const response = await fetch(url);
+      const blob = await response.blob();
+      saveAs(blob, 'ai-generated-image.webp');
+    } catch (error) {
+      console.error('Error downloading image:', error);
+      setError('Failed to download image');
+    }
+  };
 
   const generateImage = async () => {
     if (!publicKey) {
@@ -98,6 +111,7 @@ export default function AIImageGenerator({ onImageGenerated }: AIImageGeneratorP
       }
       
       if (data.imageUrl) {
+        setDownloadUrl(data.imageUrl);
         onImageGenerated(data.imageUrl);
         await checkGenerationLimit();
       } else {
@@ -177,6 +191,20 @@ export default function AIImageGenerator({ onImageGenerated }: AIImageGeneratorP
             )}
           </span>
         </button>
+
+        {downloadUrl && (
+          <div className="mt-4 flex justify-end">
+            <button
+              onClick={() => handleDownload(downloadUrl)}
+              className="btn-secondary flex items-center space-x-2 text-sm"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              </svg>
+              <span>Download Image</span>
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

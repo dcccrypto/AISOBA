@@ -29,9 +29,11 @@
     "@solana/wallet-adapter-react-ui": "^0.9.35",
     "@solana/wallet-adapter-wallets": "^0.19.32",
     "@solana/web3.js": "^1.98.0",
+    "@types/file-saver": "^2.0.7",
     "bs58": "^6.0.0",
     "cors": "^2.8.5",
     "date-fns": "^4.1.0",
+    "file-saver": "^2.0.5",
     "next": "^15.1.1",
     "replicate": "^1.0.1"
   }

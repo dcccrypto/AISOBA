@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useWallet, useConnection } from '@solana/wallet-adapter-react';
 import { 
   Connection, 
@@ -21,19 +21,41 @@ import {
   getAssociatedTokenAddress,
   createMintToInstruction,
 } from '@solana/spl-token';
+import { applyOverlay } from '../utils/imageProcessing';
 
 interface NFTMinterProps {
   imageUrl: string;
 }
 
-// Add collection address constant
-const COLLECTION_ADDRESS = new PublicKey('BUj8NP6QESpG9JPVN2ca87ZbSZtuJ3JgUCCNCarKBG7r');
+// Update the collection address constant with your new collection's address
+const COLLECTION_ADDRESS = new PublicKey('JBvMgUVSD9oQiwcfQx932CCbheaRpmiSFoLpESwzGeyn');
 
 export default function NFTMinter({ imageUrl }: NFTMinterProps) {
   const { publicKey, signTransaction } = useWallet();
   const { connection } = useConnection();
   const [minting, setMinting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [processedImageUrl, setProcessedImageUrl] = useState<string>('');
+  const [isProcessing, setIsProcessing] = useState(true);
+  const [isPreviewMode, setIsPreviewMode] = useState(false);
+
+  useEffect(() => {
+    const processImage = async () => {
+      try {
+        setIsProcessing(true);
+        const overlaidImage = await applyOverlay(imageUrl);
+        setProcessedImageUrl(overlaidImage);
+      } catch (error) {
+        console.error('Error processing image:', error);
+        setError('Failed to process image');
+        setProcessedImageUrl(imageUrl);
+      } finally {
+        setIsProcessing(false);
+      }
+    };
+
+    processImage();
+  }, [imageUrl]);
 
   const mintNFT = async () => {
     if (!publicKey || !signTransaction) {
@@ -213,20 +235,43 @@ export default function NFTMinter({ imageUrl }: NFTMinterProps) {
   return (
     <div className="card hover:shadow-orange-500/20">
       <div className="flex flex-col space-y-6">
-        <h2 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-[#ff6b00] to-[#ff8533]">
-          Mint as NFT
-        </h2>
+        <div className="flex items-center justify-between">
+          <h2 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-[#ff6b00] to-[#ff8533]">
+            Mint as NFT
+          </h2>
+          <button
+            onClick={() => setIsPreviewMode(!isPreviewMode)}
+            className="px-3 py-1 text-sm rounded-full bg-gray-800 hover:bg-gray-700 transition-colors duration-200"
+          >
+            {isPreviewMode ? 'Show Original' : 'Preview NFT'}
+          </button>
+        </div>
 
         <div className="relative group">
-          <div className="image-preview overflow-hidden">
-            <img 
-              src={imageUrl} 
-              alt="Generated artwork" 
-              className="w-full h-auto rounded-lg transform transition-transform duration-300 group-hover:scale-105"
-            />
-          </div>
+          {isProcessing ? (
+            <div className="w-full h-64 flex items-center justify-center bg-gray-800 rounded-lg">
+              <div className="loading-spinner" />
+            </div>
+          ) : (
+            <div className="relative">
+              <div className="image-preview overflow-hidden rounded-lg">
+                <img 
+                  src={isPreviewMode ? processedImageUrl : imageUrl} 
+                  alt={isPreviewMode ? "NFT preview" : "Original artwork"} 
+                  className="w-full h-auto transform transition-transform duration-300 group-hover:scale-105"
+                />
+              </div>
+              {isPreviewMode && (
+                <div className="absolute top-2 right-2 bg-black/70 px-3 py-1 rounded-full">
+                  <p className="text-xs text-white">NFT Preview</p>
+                </div>
+              )}
+            </div>
+          )}
           <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-lg flex items-end justify-center p-4">
-            <p className="text-white text-sm">Your generated masterpiece</p>
+            <p className="text-white text-sm">
+              {isPreviewMode ? 'Preview of your NFT with overlay' : 'Click Preview NFT to see how it will look'}
+            </p>
           </div>
         </div>
 
@@ -242,9 +287,9 @@ export default function NFTMinter({ imageUrl }: NFTMinterProps) {
         )}
 
         <button
-          className="btn-primary group"
           onClick={mintNFT}
-          disabled={minting || !publicKey}
+          disabled={minting || isProcessing || !processedImageUrl}
+          className="btn-primary group relative"
         >
           <span className="flex items-center justify-center">
             {minting ? (
@@ -255,13 +300,19 @@ export default function NFTMinter({ imageUrl }: NFTMinterProps) {
             ) : (
               <>
                 <svg className="w-5 h-5 mr-2 group-hover:animate-pulse" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M4 5a2 2 0 00-2 2v8a2 2 0 002 2h12a2 2 0 002-2V7a2 2 0 00-2-2h-1.586a1 1 0 01-.707-.293l-1.121-1.121A2 2 0 0011.172 3H8.828a2 2 0 00-1.414.586L6.293 4.707A1 1 0 015.586 5H4zm6 9a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" />
+                  <path d="M4 4a2 2 0 00-2 2v8a2 2 0 002 2h12a2 2 0 002-2V8a2 2 0 00-2-2h-5L9 4H4zm7 5a1 1 0 00-2 0v1H8a1 1 0 000 2h1v1a1 1 0 002 0v-1h1a1 1 0 000-2h-1V9z" />
                 </svg>
                 Mint NFT
               </>
             )}
           </span>
         </button>
+
+        {isPreviewMode && (
+          <p className="text-sm text-gray-400 text-center">
+            This is how your NFT will look after minting. The overlay will be permanently applied.
+          </p>
+        )}
       </div>
     </div>
   );

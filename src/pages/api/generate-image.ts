@@ -53,20 +53,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     try {
+      const enhancedPrompt = `SOBART ${prompt.trim()}`;
+
       const prediction = await Promise.race([
         replicate.predictions.create({
-          version: "e0e293b97de2af9d7ad1851c13b14e01036fa7040b6dd39eec05d18f76dcc997",
+          version: "05baef8ab97622bdac86cdd49b2fb52bfd3c7b5ae798a17b71b9725a5793ab88",
           input: {
-            prompt: prompt,
-            model: "dev",
+            prompt: enhancedPrompt,
+            model: "schnell",
             go_fast: true,
-            lora_scale: 1,
+            lora_scale: 1.5,
             megapixels: "1",
             num_outputs: 1,
             aspect_ratio: "1:1",
             output_format: "webp",
             guidance_scale: 3,
-            output_quality: 80,
+            output_quality: 100,
+            disable_safety_checker: true,
             prompt_strength: 0.8,
             extra_lora_scale: 1,
             num_inference_steps: 20
