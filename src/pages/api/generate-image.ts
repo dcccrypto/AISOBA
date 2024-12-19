@@ -57,21 +57,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       const prediction = await Promise.race([
         replicate.predictions.create({
-          version: "dcccrypto/sdxl-soba:92c16aaef4850f7a1c918e03d9c7d6dd84d87ead418d5dd3afbc3b6e16f61af3",
+          version: "stability-ai/sdxl:39ed52f2a78e934b3ba6e2a89f5b1c712de7dfea535525255b1aa35c5565e08b",
           input: {
             prompt: enhancedPrompt,
             negative_prompt: "lowres, text, watermark, logo, signature, cropped, worst quality, low quality, jpeg artifacts, ugly, duplicate, morbid, mutilated, out of frame, extra fingers, mutated hands, poorly drawn hands, poorly drawn face, mutation, deformed, blurry, dehydrated, bad anatomy, bad proportions, extra limbs, cloned face, disfigured, gross proportions, malformed limbs, missing arms, missing legs, extra arms, extra legs, fused fingers, too many fingers, long neck",
-            lora_scale: 1.5,
-            megapixels: "1",
+            width: 1024,
+            height: 1024,
             num_outputs: 1,
-            aspect_ratio: "1:1",
-            output_format: "webp",
+            scheduler: "K_EULER",
+            num_inference_steps: 50,
             guidance_scale: 7.5,
-            output_quality: 100,
-            disable_safety_checker: true,
             prompt_strength: 0.8,
-            extra_lora_scale: 1,
-            num_inference_steps: 50
+            refine: "expert_ensemble_refiner",
+            high_noise_frac: 0.8,
+            apply_watermark: false
           }
         }) as Promise<ReplicatePrediction>,
         new Promise<never>((_, reject) => 
