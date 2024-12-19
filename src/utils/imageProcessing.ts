@@ -12,30 +12,24 @@ export async function applyOverlay(originalImageUrl: string): Promise<string> {
     const overlay = new Image();
     let loadedImages = 0;
 
-    // Add error logging
     console.log('Starting image processing...');
-    console.log('Original image URL:', originalImageUrl);
-    console.log('Overlay path:', '/nft/nftoverlay.png');
-
+    
     const checkAllLoaded = () => {
       loadedImages++;
       console.log(`Loaded ${loadedImages}/2 images`);
       
       if (loadedImages === 2) {
         try {
-          console.log('Both images loaded, applying overlay...');
-          console.log('Image dimensions:', image.width, 'x', image.height);
-          
           canvas.width = image.width;
           canvas.height = image.height;
           
           // Draw original image
           ctx.drawImage(image, 0, 0);
           
-          // Draw overlay
+          // Draw overlay with proper opacity
+          ctx.globalAlpha = 1.0; // Ensure full opacity
           ctx.drawImage(overlay, 0, 0, image.width, image.height);
           
-          // Convert to base64
           const result = canvas.toDataURL('image/webp', 0.9);
           console.log('Overlay applied successfully');
           resolve(result);
@@ -46,16 +40,10 @@ export async function applyOverlay(originalImageUrl: string): Promise<string> {
       }
     };
 
-    image.onload = () => {
-      console.log('Original image loaded successfully');
-      checkAllLoaded();
-    };
-
-    overlay.onload = () => {
-      console.log('Overlay image loaded successfully');
-      checkAllLoaded();
-    };
-
+    // Set up image loading
+    image.onload = checkAllLoaded;
+    overlay.onload = checkAllLoaded;
+    
     image.onerror = (error) => {
       console.error('Failed to load original image:', error);
       reject(new Error(`Failed to load original image: ${originalImageUrl}`));
@@ -63,20 +51,15 @@ export async function applyOverlay(originalImageUrl: string): Promise<string> {
 
     overlay.onerror = (error) => {
       console.error('Failed to load overlay image:', error);
-      reject(new Error('Failed to load overlay image: /nft/nftoverlay.png'));
+      reject(new Error('Failed to load overlay image'));
     };
 
-    // Set crossOrigin before setting src
+    // Important: Set crossOrigin before setting src
     image.crossOrigin = 'anonymous';
     overlay.crossOrigin = 'anonymous';
     
     // Load the images
-    try {
-      image.src = originalImageUrl;
-      overlay.src = '/nft/nftoverlay.png';
-    } catch (error) {
-      console.error('Error setting image sources:', error);
-      reject(error);
-    }
+    image.src = originalImageUrl;
+    overlay.src = '/nft/nftoverlay.png'; // This path is correct for Next.js public directory
   });
 } 
