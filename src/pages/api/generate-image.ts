@@ -54,6 +54,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     try {
       const enhancedPrompt = `soba ape ${prompt.trim()}`;
+      console.log('Starting image generation with prompt:', enhancedPrompt);
 
       const output = await replicate.run(
         "dcccrypto/sdxl-soba:92c16aaef4850f7a1c918e03d9c7d6dd84d87ead418d5dd3afbc3b6e16f61af3",
@@ -76,27 +77,54 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }
       );
 
+      console.log('Raw output from Replicate:', output);
+
       // Handle different output types
       let imageUrl: string;
+      
+      if (!output) {
+        console.error('No output received from Replicate');
+        throw new Error('No output received from image generation');
+      }
+
       if (typeof output === 'string') {
+        console.log('Output is a string URL:', output);
         imageUrl = output;
-      } else if (Array.isArray(output) && output.length > 0) {
-        imageUrl = output[0];
-      } else if (output && typeof output === 'object' && 'output' in output) {
-        // Handle case where output might be a prediction object
-        const outputArray = (output as { output: string[] }).output;
-        if (!outputArray || outputArray.length === 0) {
-          throw new Error('No image URL in model output');
+      } else if (Array.isArray(output)) {
+        console.log('Output is an array:', output);
+        if (output.length === 0) {
+          throw new Error('Empty array received from image generation');
         }
-        imageUrl = outputArray[0];
+        imageUrl = output[0];
+      } else if (typeof output === 'object') {
+        console.log('Output is an object:', output);
+        if ('output' in output && Array.isArray(output.output)) {
+          if (!output.output || output.output.length === 0) {
+            throw new Error('No image URL in model output array');
+          }
+          imageUrl = output.output[0];
+        } else {
+          throw new Error(`Unexpected output format: ${JSON.stringify(output)}`);
+        }
       } else {
-        throw new Error('Invalid output format from image generation');
+        console.error('Invalid output type:', typeof output);
+        throw new Error(`Invalid output type: ${typeof output}`);
       }
 
       // Validate the URL
-      if (!imageUrl || typeof imageUrl !== 'string') {
-        throw new Error('Invalid image URL generated');
+      if (!imageUrl) {
+        throw new Error('No image URL extracted from output');
       }
+
+      if (typeof imageUrl !== 'string') {
+        throw new Error(`Invalid image URL type: ${typeof imageUrl}`);
+      }
+
+      if (!imageUrl.startsWith('http')) {
+        throw new Error(`Invalid image URL format: ${imageUrl}`);
+      }
+
+      console.log('Final image URL:', imageUrl);
 
       // Create the database record
       const imageGeneration = await prisma.imageGeneration.create({
@@ -113,7 +141,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const errorMessage = apiError instanceof Error ? apiError.message : 'Unknown API error';
       return res.status(500).json({ 
         message: 'Failed to generate image. Please try again.',
-        error: errorMessage
+        error: errorMessage,
+        details: apiError // Include more error details for debugging
       });
     }
   } catch (error) {
