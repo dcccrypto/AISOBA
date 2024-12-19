@@ -76,13 +76,30 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }
       );
 
-      if (!output || !Array.isArray(output) || output.length === 0) {
-        throw new Error('No output received from image generation');
+      // Handle different output types
+      let imageUrl: string;
+      if (typeof output === 'string') {
+        imageUrl = output;
+      } else if (Array.isArray(output) && output.length > 0) {
+        imageUrl = output[0];
+      } else if (output && typeof output === 'object' && 'output' in output) {
+        // Handle case where output might be a prediction object
+        const outputArray = (output as { output: string[] }).output;
+        if (!outputArray || outputArray.length === 0) {
+          throw new Error('No image URL in model output');
+        }
+        imageUrl = outputArray[0];
+      } else {
+        throw new Error('Invalid output format from image generation');
       }
 
-      const imageUrl = output[0];
+      // Validate the URL
+      if (!imageUrl || typeof imageUrl !== 'string') {
+        throw new Error('Invalid image URL generated');
+      }
 
-      await prisma.imageGeneration.create({
+      // Create the database record
+      const imageGeneration = await prisma.imageGeneration.create({
         data: {
           userId: user.id,
           imageUrl: imageUrl,
