@@ -56,6 +56,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const enhancedPrompt = `soba ape ${prompt.trim()}`;
       console.log('Starting image generation with prompt:', enhancedPrompt);
 
+      // According to Replicate docs, run() returns a string[] for this model
       const output = await replicate.run(
         "dcccrypto/sdxl-soba:92c16aaef4850f7a1c918e03d9c7d6dd84d87ead418d5dd3afbc3b6e16f61af3",
         {
@@ -77,83 +78,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }
       );
 
-      console.log('Raw output from Replicate:', JSON.stringify(output, null, 2));
+      console.log('Raw Replicate output:', output);
 
-      // Handle different output types
-      let imageUrl: string;
-
-      if (!output) {
-        console.error('No output received from Replicate');
-        throw new Error('No output received from image generation');
+      // SDXL models return an array of URLs, we want the first one
+      if (!Array.isArray(output) || output.length === 0) {
+        console.error('Invalid output format:', output);
+        throw new Error('Model did not return a valid image URL');
       }
 
-      // Direct array response
-      if (Array.isArray(output)) {
-        console.log('Output is an array:', output);
-        if (output.length === 0) {
-          throw new Error('Empty array received from image generation');
-        }
-        imageUrl = output[0];
-      } 
-      // Prediction object response
-      else if (typeof output === 'object' && output !== null) {
-        console.log('Output is an object:', output);
-        // Case 1: { output: string[] }
-        if ('output' in output && Array.isArray(output.output)) {
-          if (!output.output || output.output.length === 0) {
-            throw new Error('No image URL in model output array');
-          }
-          imageUrl = output.output[0];
-        }
-        // Case 2: { url: string }
-        else if ('url' in output && typeof output.url === 'string') {
-          imageUrl = output.url;
-        }
-        // Case 3: Single object with string property
-        else {
-          const firstValue = Object.values(output)[0];
-          if (typeof firstValue === 'string' && firstValue.startsWith('http')) {
-            imageUrl = firstValue;
-          } else {
-            console.error('Unexpected object structure:', output);
-            throw new Error(`Unexpected output format: ${JSON.stringify(output)}`);
-          }
-        }
-      }
-      // Direct string response
-      else if (typeof output === 'string') {
-        console.log('Output is a string URL:', output);
-        imageUrl = output;
-      }
-      // Unknown response type
-      else {
-        console.error('Invalid output type:', typeof output);
-        throw new Error(`Invalid output type: ${typeof output}`);
-      }
+      const imageUrl = output[0];
 
-      // Validate the URL
-      if (!imageUrl) {
-        throw new Error('No image URL extracted from output');
+      if (!imageUrl || !imageUrl.startsWith('http')) {
+        console.error('Invalid image URL:', imageUrl);
+        throw new Error('Model returned an invalid image URL');
       }
-
-      if (typeof imageUrl !== 'string') {
-        console.error('Invalid imageUrl type:', typeof imageUrl, 'Value:', imageUrl);
-        throw new Error(`Invalid image URL type: ${typeof imageUrl}`);
-      }
-
-      if (!imageUrl.startsWith('http')) {
-        console.error('Invalid URL format:', imageUrl);
-        throw new Error(`Invalid image URL format: ${imageUrl}`);
-      }
-
-      console.log('Final validated image URL:', imageUrl);
 
       // Create the database record
-      const imageGeneration = await prisma.imageGeneration.create({
+      await prisma.imageGeneration.create({
         data: {
           userId: user.id,
-          imageUrl: imageUrl,
-          prompt: prompt,
+          imageUrl,
+          prompt,
         },
       });
 
@@ -161,20 +106,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     } catch (apiError) {
       console.error('Replicate API Error:', apiError);
-      const errorMessage = apiError instanceof Error ? apiError.message : 'Unknown API error';
-      const errorDetails = apiError instanceof Error ? apiError.stack : JSON.stringify(apiError);
       return res.status(500).json({ 
         message: 'Failed to generate image. Please try again.',
-        error: errorMessage,
-        details: errorDetails
+        error: apiError instanceof Error ? apiError.message : 'Unknown API error'
       });
     }
   } catch (error) {
     console.error('Server Error:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown server error';
     return res.status(500).json({ 
       message: 'Server error. Please try again later.',
-      error: errorMessage
+      error: error instanceof Error ? error.message : 'Unknown server error'
     });
   } finally {
     await prisma.$disconnect();
