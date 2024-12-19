@@ -53,26 +53,29 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     try {
-      const enhancedPrompt = `soba ${prompt.trim()}`;
-      console.log('Starting image generation with prompt:', enhancedPrompt);
+      // Enhanced prompt with more descriptive elements and style cues
+      const enhancedPrompt = `soba, highly detailed, 8k uhd, dslr, soft lighting, high quality, film grain, Fujifilm XT3, ${prompt.trim()}, trending on artstation, masterpiece, best quality, ultra realistic, photorealistic, award winning, breathtaking`;
+
+      // Add negative prompt to avoid common issues
+      const negativePrompt = "lowres, text, watermark, logo, signature, cropped, worst quality, low quality, jpeg artifacts, ugly, duplicate, morbid, mutilated, out of frame, extra fingers, mutated hands, poorly drawn hands, poorly drawn face, mutation, deformed, blurry, dehydrated, bad anatomy, bad proportions, extra limbs, cloned face, disfigured, gross proportions, malformed limbs, missing arms, missing legs, extra arms, extra legs, fused fingers, too many fingers, long neck, bad hands, bad feet, bad anatomy";
 
       // Create prediction using Replicate API
       const prediction = await replicate.predictions.create({
         version: "92c16aaef4850f7a1c918e03d9c7d6dd84d87ead418d5dd3afbc3b6e16f61af3",
         input: {
           prompt: enhancedPrompt,
-          negative_prompt: "lowres, text, watermark, logo, signature, cropped, worst quality, low quality, jpeg artifacts, ugly, duplicate, morbid, mutilated, out of frame, extra fingers, mutated hands, poorly drawn hands, poorly drawn face, mutation, deformed, blurry, dehydrated, bad anatomy, bad proportions, extra limbs, cloned face, disfigured, gross proportions, malformed limbs, missing arms, missing legs, extra arms, extra legs, fused fingers, too many fingers, long neck",
+          negative_prompt: negativePrompt,
           width: 1024,
           height: 1024,
           num_outputs: 1,
           scheduler: "K_EULER",
           num_inference_steps: 50,
-          guidance_scale: 7.5,
+          guidance_scale: 7.5,        // Increased for better prompt adherence
           prompt_strength: 0.8,
           refine: "expert_ensemble_refiner",
           high_noise_frac: 0.8,
           apply_watermark: false,
-          lora_scale: 0.6
+          lora_scale: 0.8             // Increased for stronger style influence
         }
       });
 
