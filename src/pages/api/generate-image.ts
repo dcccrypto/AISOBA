@@ -53,26 +53,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     try {
-      const enhancedPrompt = `SOBART ${prompt.trim()}`;
+      const enhancedPrompt = `soba ape ${prompt.trim()}`;
 
       const prediction = await Promise.race([
         replicate.predictions.create({
-          version: "05baef8ab97622bdac86cdd49b2fb52bfd3c7b5ae798a17b71b9725a5793ab88",
+          version: "dcccrypto/sdxl-soba:92c16aaef4850f7a1c918e03d9c7d6dd84d87ead418d5dd3afbc3b6e16f61af3",
           input: {
             prompt: enhancedPrompt,
-            model: "schnell",
-            go_fast: true,
+            negative_prompt: "lowres, text, watermark, logo, signature, cropped, worst quality, low quality, jpeg artifacts, ugly, duplicate, morbid, mutilated, out of frame, extra fingers, mutated hands, poorly drawn hands, poorly drawn face, mutation, deformed, blurry, dehydrated, bad anatomy, bad proportions, extra limbs, cloned face, disfigured, gross proportions, malformed limbs, missing arms, missing legs, extra arms, extra legs, fused fingers, too many fingers, long neck",
             lora_scale: 1.5,
             megapixels: "1",
             num_outputs: 1,
             aspect_ratio: "1:1",
             output_format: "webp",
-            guidance_scale: 3,
+            guidance_scale: 7.5,
             output_quality: 100,
             disable_safety_checker: true,
             prompt_strength: 0.8,
             extra_lora_scale: 1,
-            num_inference_steps: 20
+            num_inference_steps: 50
           }
         }) as Promise<ReplicatePrediction>,
         new Promise<never>((_, reject) => 
