@@ -35,6 +35,7 @@
     "date-fns": "^4.1.0",
     "file-saver": "^2.0.5",
     "next": "^15.1.1",
+    "react-hot-toast": "^2.4.1",
     "replicate": "^1.0.1"
   }
 }
