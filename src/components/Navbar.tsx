@@ -13,9 +13,9 @@ export default function Navbar() {
       <div className="responsive-container py-4">
         <div className="flex items-center justify-between">
           <Link href="/" className="flex items-center space-x-2">
-            <img src="/logo.png" alt="AISOBA Logo" className="h-8 w-auto" />
+            <img src="/logo.png" alt="SOBA Verse Logo" className="h-8 w-auto" />
             <span className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-[#ff6b00] to-[#ff8533]">
-              AISOBA
+              SOBA Verse
             </span>
           </Link>
 
@@ -25,6 +25,9 @@ export default function Navbar() {
             </Link>
             <Link href="/gallery" className="text-gray-300 hover:text-[#ff6b00] transition-colors">
               Gallery
+            </Link>
+            <Link href="/profile" className="text-gray-300 hover:text-[#ff6b00] transition-colors">
+              Profile
             </Link>
             <WalletMultiButtonDynamic />
           </div>
