@@ -16,6 +16,7 @@ export const config = {
     },
     responseLimit: false,
     externalResolver: true,
+    maxDuration: 300 // Set maximum duration to 5 minutes
   },
 };
 
@@ -70,11 +71,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     }
 
-    // Add timeout for Replicate API
-    const TIMEOUT_MS = 120000; // 2 minutes
+    // Increase the timeout for the Replicate API call
+    const TIMEOUT_MS = 300000; // 5 minutes
     const timeoutPromise = new Promise((_, reject) => {
       setTimeout(() => reject(new Error('Request timed out')), TIMEOUT_MS);
     });
+
+    // Add response headers to prevent timeouts
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('Keep-Alive', 'timeout=300');
 
     try {
       // Enhanced prompt with more descriptive elements and style cues
@@ -83,6 +88,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       // Add negative prompt to avoid common issues
       const negativePrompt = "lowres, text, watermark, logo, signature, cropped, worst quality, low quality, jpeg artifacts, ugly, duplicate, morbid, mutilated, out of frame, extra fingers, mutated hands, poorly drawn hands, poorly drawn face, mutation, deformed, blurry, dehydrated, bad anatomy, bad proportions, extra limbs, cloned face, disfigured, gross proportions, malformed limbs, missing arms, missing legs, extra arms, extra legs, fused fingers, too many fingers, long neck, bad hands, bad feet, bad anatomy";
 
+      // Add status update before starting the prediction
+      console.log('Starting image generation...');
+      
       // Create prediction using Replicate API with proper typing
       const prediction = await Promise.race([
         replicate.predictions.create({
@@ -106,7 +114,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         timeoutPromise
       ]) as Prediction;
 
-      console.log('Prediction created:', JSON.stringify(prediction, null, 2));
+      console.log('Prediction started, waiting for completion...');
+
+      // Add more detailed error handling
+      if (!prediction || !prediction.id) {
+        throw new Error('Failed to start prediction');
+      }
 
       // Wait for the prediction with timeout and proper typing
       let finalPrediction = await Promise.race([
@@ -155,22 +168,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
 
     } catch (apiError: any) {
-      console.error('API Error details:', JSON.stringify(apiError, null, 2));
+      console.error('Detailed API Error:', {
+        error: apiError,
+        stack: apiError.stack,
+        message: apiError.message
+      });
       
-      // Extract error message from Replicate API error object
-      let errorMessage = 'Failed to generate image';
+      // More specific error message
+      let errorMessage = 'Image generation timed out. Please try again.';
       
-      if (typeof apiError === 'object') {
-        // Try to get the error message from common error object properties
-        errorMessage = apiError.detail || 
-                      apiError.message || 
-                      apiError.error || 
-                      'Failed to generate image';
+      if (apiError.message?.includes('timed out')) {
+        errorMessage = 'The image generation is taking longer than expected. Please try again.';
       }
 
-      return res.status(500).json({
+      return res.status(504).json({
         success: false,
-        message: errorMessage
+        message: errorMessage,
+        retryable: true
       });
     }
   } catch (error: any) {

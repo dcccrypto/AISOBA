@@ -13,6 +13,8 @@ export default function AIImageGenerator({ onImageGenerated }: AIImageGeneratorP
   const [remainingGenerations, setRemainingGenerations] = useState(5);
   const [error, setError] = useState<string | null>(null);
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
+  const MAX_RETRIES = 2;
 
   const checkGenerationLimit = async () => {
     if (!publicKey) return;
@@ -86,45 +88,39 @@ export default function AIImageGenerator({ onImageGenerated }: AIImageGeneratorP
     setError(null);
 
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 180000); // 3 minutes timeout
+      const response = await fetch('/api/generate-image', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          prompt,
+          wallet: publicKey.toString(),
+        }),
+      });
 
-      try {
-        const response = await fetch('/api/generate-image', {
-          method: 'POST',
-          headers: { 
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-          },
-          body: JSON.stringify({
-            prompt: prompt.trim(),
-            wallet: publicKey.toString(),
-          }),
-          signal: controller.signal
-        });
+      if (!response.ok) {
+        const errorData = await response.json();
         
-        clearTimeout(timeoutId);
-        
-        const data = await response.json();
-        
-        if (!response.ok || !data.success) {
-          throw new Error(data.message || 'Failed to generate image');
-        }
-        
-        if (!data.imageUrl) {
-          throw new Error('No image URL in response');
+        if (response.status === 504 && retryCount < MAX_RETRIES) {
+          setRetryCount(prev => prev + 1);
+          console.log(`Retrying... Attempt ${retryCount + 1} of ${MAX_RETRIES}`);
+          await generateImage();
+          return;
         }
 
-        setDownloadUrl(data.imageUrl);
-        onImageGenerated(data.imageUrl);
-        await checkGenerationLimit();
-
-      } catch (error: any) {
-        if (error.name === 'AbortError') {
-          throw new Error('Request timed out. Please try again.');
-        }
-        throw error;
+        throw new Error(errorData.message || 'Failed to generate image');
       }
+
+      const data = await response.json();
+      
+      if (!data.success) {
+        throw new Error(data.message || 'Failed to generate image');
+      }
+
+      setDownloadUrl(data.imageUrl);
+      onImageGenerated(data.imageUrl);
+      setRetryCount(0);
 
     } catch (error) {
       console.error('Error generating image:', error);
