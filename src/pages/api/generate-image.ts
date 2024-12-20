@@ -153,11 +153,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         throw new Error('Model returned an invalid image URL');
       }
 
-      // Create the database record
+      // Create the database record with httpUrl
       await prisma.imageGeneration.create({
         data: {
           userId: user.id,
           imageUrl,
+          httpUrl: imageUrl,
           prompt,
         },
       });
