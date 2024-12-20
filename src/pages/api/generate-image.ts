@@ -13,6 +13,9 @@ export const config = {
     bodyParser: true,
     responseLimit: false,
     externalResolver: true,
+    bodyParser: {
+      sizeLimit: '10mb'
+    }
   },
 };
 
@@ -52,6 +55,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(404).json({ message: 'User not found' });
     }
 
+    // Add timeout for Replicate API
+    const TIMEOUT_MS = 120000; // 2 minutes
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Request timed out')), TIMEOUT_MS);
+    });
+
     try {
       // Enhanced prompt with more descriptive elements and style cues
       const enhancedPrompt = `soba, highly detailed, 8k uhd, dslr, soft lighting, high quality, film grain, Fujifilm XT3, ${prompt.trim()}, trending on artstation, masterpiece, best quality, ultra realistic, photorealistic, award winning, breathtaking`;
@@ -60,39 +69,50 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const negativePrompt = "lowres, text, watermark, logo, signature, cropped, worst quality, low quality, jpeg artifacts, ugly, duplicate, morbid, mutilated, out of frame, extra fingers, mutated hands, poorly drawn hands, poorly drawn face, mutation, deformed, blurry, dehydrated, bad anatomy, bad proportions, extra limbs, cloned face, disfigured, gross proportions, malformed limbs, missing arms, missing legs, extra arms, extra legs, fused fingers, too many fingers, long neck, bad hands, bad feet, bad anatomy";
 
       // Create prediction using Replicate API
-      const prediction = await replicate.predictions.create({
-        version: "92c16aaef4850f7a1c918e03d9c7d6dd84d87ead418d5dd3afbc3b6e16f61af3",
-        input: {
-          prompt: enhancedPrompt,
-          negative_prompt: negativePrompt,
-          width: 1024,
-          height: 1024,
-          num_outputs: 1,
-          scheduler: "K_EULER",
-          num_inference_steps: 50,
-          guidance_scale: 7.5,        // Increased for better prompt adherence
-          prompt_strength: 0.8,
-          refine: "expert_ensemble_refiner",
-          high_noise_frac: 0.8,
-          apply_watermark: false,
-          lora_scale: 0.8             // Increased for stronger style influence
-        }
-      });
+      const prediction = await Promise.race([
+        replicate.predictions.create({
+          version: "92c16aaef4850f7a1c918e03d9c7d6dd84d87ead418d5dd3afbc3b6e16f61af3",
+          input: {
+            prompt: enhancedPrompt,
+            negative_prompt: negativePrompt,
+            width: 1024,
+            height: 1024,
+            num_outputs: 1,
+            scheduler: "K_EULER",
+            num_inference_steps: 50,
+            guidance_scale: 7.5,        // Increased for better prompt adherence
+            prompt_strength: 0.8,
+            refine: "expert_ensemble_refiner",
+            high_noise_frac: 0.8,
+            apply_watermark: false,
+            lora_scale: 0.8             // Increased for stronger style influence
+          }
+        }),
+        timeoutPromise
+      ]);
 
-      console.log('Prediction created:', prediction);
+      console.log('Prediction created:', JSON.stringify(prediction, null, 2));
 
-      // Wait for the prediction to complete
-      let finalPrediction = await replicate.wait(prediction);
-      console.log('Final prediction:', finalPrediction);
+      // Wait for the prediction with timeout
+      let finalPrediction = await Promise.race([
+        replicate.wait(prediction),
+        timeoutPromise
+      ]);
+
+      console.log('Final prediction:', JSON.stringify(finalPrediction, null, 2));
 
       // Add type checking for the prediction response
       if (!isReplicatePrediction(finalPrediction)) {
         throw new Error('Invalid prediction response format');
       }
 
-      // Check for API-level errors
       if (finalPrediction.status === 'failed') {
-        throw new Error(finalPrediction.error || 'Model prediction failed');
+        const errorMessage = finalPrediction.error || 'Model prediction failed';
+        console.error('Prediction failed:', errorMessage);
+        return res.status(400).json({ 
+          success: false,
+          message: errorMessage
+        });
       }
 
       if (!finalPrediction.output || !Array.isArray(finalPrediction.output)) {
@@ -119,28 +139,32 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         imageUrl 
       });
 
-    } catch (apiError) {
-      // Properly format API errors
-      console.error('Replicate API Error:', apiError);
+    } catch (apiError: any) {
+      console.error('API Error details:', JSON.stringify(apiError, null, 2));
       
-      // Handle ReplicateError type
-      if (apiError && typeof apiError === 'object' && 'detail' in apiError) {
-        const replicateError = apiError as ReplicateError;
-        throw new Error(replicateError.detail || replicateError.message || 'API Error');
+      // Extract error message from Replicate API error object
+      let errorMessage = 'Failed to generate image';
+      
+      if (typeof apiError === 'object') {
+        // Try to get the error message from common error object properties
+        errorMessage = apiError.detail || 
+                      apiError.message || 
+                      apiError.error || 
+                      'Failed to generate image';
       }
-      
-      throw apiError; // Re-throw if not a ReplicateError
+
+      return res.status(500).json({
+        success: false,
+        message: errorMessage
+      });
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error('Server Error:', error);
     
-    // Properly format the error response
     return res.status(500).json({ 
       success: false,
       message: error instanceof Error ? error.message : 'An unexpected error occurred',
-      error: process.env.NODE_ENV === 'development' ? 
-        error instanceof Error ? error.stack : String(error) 
-        : undefined
+      details: process.env.NODE_ENV === 'development' ? JSON.stringify(error, null, 2) : undefined
     });
   } finally {
     await prisma.$disconnect();

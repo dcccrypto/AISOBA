@@ -86,31 +86,45 @@ export default function AIImageGenerator({ onImageGenerated }: AIImageGeneratorP
     setError(null);
 
     try {
-      const response = await fetch('/api/generate-image', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        body: JSON.stringify({
-          prompt: prompt.trim(),
-          wallet: publicKey.toString(),
-        }),
-      });
-      
-      const data = await response.json();
-      
-      if (!response.ok || !data.success) {
-        throw new Error(data.message || 'Failed to generate image');
-      }
-      
-      if (!data.imageUrl) {
-        throw new Error('No image URL in response');
-      }
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 180000); // 3 minutes timeout
 
-      setDownloadUrl(data.imageUrl);
-      onImageGenerated(data.imageUrl);
-      await checkGenerationLimit();
+      try {
+        const response = await fetch('/api/generate-image', {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+          body: JSON.stringify({
+            prompt: prompt.trim(),
+            wallet: publicKey.toString(),
+          }),
+          signal: controller.signal
+        });
+        
+        clearTimeout(timeoutId);
+        
+        const data = await response.json();
+        
+        if (!response.ok || !data.success) {
+          throw new Error(data.message || 'Failed to generate image');
+        }
+        
+        if (!data.imageUrl) {
+          throw new Error('No image URL in response');
+        }
+
+        setDownloadUrl(data.imageUrl);
+        onImageGenerated(data.imageUrl);
+        await checkGenerationLimit();
+
+      } catch (error: any) {
+        if (error.name === 'AbortError') {
+          throw new Error('Request timed out. Please try again.');
+        }
+        throw error;
+      }
 
     } catch (error) {
       console.error('Error generating image:', error);
