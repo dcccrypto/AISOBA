@@ -2,6 +2,16 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import { prisma } from '../../lib/db';
 import { ipfsToHttp } from '../../utils/ipfs';
 
+// Define the type for NFT selection
+type NFTSelect = {
+  id: boolean;
+  imageUrl: boolean;
+  title: boolean;
+  mintAddress: boolean;
+  verified: boolean;
+  createdAt: boolean;
+}
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
     return res.status(405).json({ message: 'Method not allowed' });
@@ -26,6 +36,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const nfts = await prisma.nFT.findMany({
         where: { userId: user.id },
         orderBy: { createdAt: 'desc' },
+        select: {
+          id: true,
+          imageUrl: true,
+          title: true,
+          mintAddress: true,
+          verified: true,
+          createdAt: true
+        } as NFTSelect
       });
       const processedNfts = nfts.map(nft => ({
         ...nft,
