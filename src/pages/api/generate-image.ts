@@ -1,6 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { PrismaClient } from '@prisma/client';
 import Replicate from 'replicate';
+import { Prediction } from 'replicate';
 import { ReplicatePrediction, ReplicateError } from '../../types/replicate';
 
 const prisma = new PrismaClient();
@@ -82,7 +83,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       // Add negative prompt to avoid common issues
       const negativePrompt = "lowres, text, watermark, logo, signature, cropped, worst quality, low quality, jpeg artifacts, ugly, duplicate, morbid, mutilated, out of frame, extra fingers, mutated hands, poorly drawn hands, poorly drawn face, mutation, deformed, blurry, dehydrated, bad anatomy, bad proportions, extra limbs, cloned face, disfigured, gross proportions, malformed limbs, missing arms, missing legs, extra arms, extra legs, fused fingers, too many fingers, long neck, bad hands, bad feet, bad anatomy";
 
-      // Create prediction using Replicate API
+      // Create prediction using Replicate API with proper typing
       const prediction = await Promise.race([
         replicate.predictions.create({
           version: "92c16aaef4850f7a1c918e03d9c7d6dd84d87ead418d5dd3afbc3b6e16f61af3",
@@ -101,17 +102,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             apply_watermark: false,
             lora_scale: 0.8
           }
-        }),
+        }) as Promise<Prediction>,
         timeoutPromise
-      ]);
+      ]) as Prediction;
 
       console.log('Prediction created:', JSON.stringify(prediction, null, 2));
 
-      // Wait for the prediction with timeout
+      // Wait for the prediction with timeout and proper typing
       let finalPrediction = await Promise.race([
         replicate.wait(prediction),
         timeoutPromise
-      ]);
+      ]) as ReplicatePrediction;
 
       console.log('Final prediction:', JSON.stringify(finalPrediction, null, 2));
 
