@@ -12,6 +12,16 @@ type NFTSelect = {
   createdAt: boolean;
 }
 
+// Define types for better type safety
+type ImageGenerationSelect = {
+  id: boolean;
+  imageUrl: boolean;
+  httpUrl: boolean;
+  prompt: boolean;
+  createdAt: boolean;
+  userId: boolean;
+}
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
     return res.status(405).json({ message: 'Method not allowed' });
@@ -56,10 +66,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const images = await prisma.imageGeneration.findMany({
         where: { userId: user.id },
         orderBy: { createdAt: 'desc' },
+        select: {
+          id: true,
+          imageUrl: true,
+          httpUrl: true,
+          prompt: true,
+          createdAt: true,
+          userId: true
+        } as ImageGenerationSelect
       });
+
       const processedImages = images.map(image => ({
         ...image,
-        imageUrl: ipfsToHttp(image.imageUrl),
+        imageUrl: image.httpUrl || ipfsToHttp(image.imageUrl),
       }));
       return res.status(200).json({ images: processedImages });
     }

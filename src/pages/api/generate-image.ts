@@ -1,10 +1,11 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../../lib/db';
 import Replicate from 'replicate';
 import { Prediction } from 'replicate';
 import { ReplicatePrediction, ReplicateError } from '../../types/replicate';
+import { uploadToIPFS } from '../../utils/ipfs';
+import { type Prisma } from '@prisma/client';
 
-const prisma = new PrismaClient();
 const replicate = new Replicate({
   auth: process.env.REPLICATE_API_TOKEN,
 });
@@ -153,14 +154,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         throw new Error('Model returned an invalid image URL');
       }
 
-      // Create the database record with httpUrl
-      await prisma.imageGeneration.create({
+      // Upload to IPFS and store both URLs
+      const ipfsUrl = await uploadToIPFS(imageUrl);
+      
+      // Create the database record with both URLs
+      const imageGeneration = await prisma.imageGeneration.create({
         data: {
           userId: user.id,
-          imageUrl,
-          httpUrl: imageUrl,
+          imageUrl: ipfsUrl,
           prompt,
-        },
+          httpUrl: imageUrl
+        } as Prisma.ImageGenerationUncheckedCreateInput
       });
 
       return res.status(200).json({ 
