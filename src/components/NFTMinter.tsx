@@ -38,12 +38,21 @@ export default function NFTMinter({ imageUrl }: NFTMinterProps) {
   const [processedImageUrl, setProcessedImageUrl] = useState<string>('');
   const [isProcessing, setIsProcessing] = useState(true);
   const [isPreviewMode, setIsPreviewMode] = useState(false);
+  const [selectedOverlay, setSelectedOverlay] = useState('/nft/nftoverlay.png');
+
+  const overlayOptions = [
+    { id: 1, path: '/nft/nftoverlay.png', name: 'Classic Frame' },
+    { id: 2, path: '/nft/nftoverlay2.png', name: 'Modern Frame' },
+    { id: 3, path: '/nft/nftoverlay3.png', name: 'Elegant Frame' },
+    { id: 4, path: '/nft/nftoverlay4.png', name: 'Minimal Frame' },
+    { id: 5, path: '/nft/nftoverlay5.png', name: 'Premium Frame' },
+  ];
 
   useEffect(() => {
     const processImage = async () => {
       try {
         setIsProcessing(true);
-        const overlaidImage = await applyOverlay(imageUrl);
+        const overlaidImage = await applyOverlay(imageUrl, selectedOverlay);
         setProcessedImageUrl(overlaidImage);
       } catch (error) {
         console.error('Error processing image:', error);
@@ -54,8 +63,10 @@ export default function NFTMinter({ imageUrl }: NFTMinterProps) {
       }
     };
 
-    processImage();
-  }, [imageUrl]);
+    if (imageUrl) {
+      processImage();
+    }
+  }, [imageUrl, selectedOverlay]);
 
   const mintNFT = async () => {
     if (!publicKey || !signTransaction) {
@@ -273,6 +284,29 @@ export default function NFTMinter({ imageUrl }: NFTMinterProps) {
               {isPreviewMode ? 'Preview of your NFT with overlay' : 'Click Preview NFT to see how it will look'}
             </p>
           </div>
+        </div>
+
+        <div className="grid grid-cols-5 gap-2">
+          {overlayOptions.map((overlay) => (
+            <button
+              key={overlay.id}
+              onClick={() => setSelectedOverlay(overlay.path)}
+              className={`p-2 rounded-lg border transition-all ${
+                selectedOverlay === overlay.path
+                  ? 'border-[#ff6b00] bg-[#ff6b00]/10'
+                  : 'border-gray-700 hover:border-[#ff6b00]/50'
+              }`}
+            >
+              <img
+                src={overlay.path}
+                alt={overlay.name}
+                className="w-full h-12 object-contain"
+              />
+              <p className="text-xs mt-1 text-center text-gray-400">
+                {overlay.name}
+              </p>
+            </button>
+          ))}
         </div>
 
         {error && (
