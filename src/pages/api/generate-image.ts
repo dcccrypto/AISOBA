@@ -10,12 +10,11 @@ const replicate = new Replicate({
 
 export const config = {
   api: {
-    bodyParser: true,
-    responseLimit: false,
-    externalResolver: true,
     bodyParser: {
       sizeLimit: '10mb'
-    }
+    },
+    responseLimit: false,
+    externalResolver: true,
   },
 };
 
@@ -33,26 +32,41 @@ function isReplicatePrediction(obj: any): obj is ReplicatePrediction {
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
-    return res.status(405).json({ message: 'Method not allowed' });
+    return res.status(405).json({ 
+      success: false,
+      message: 'Method not allowed' 
+    });
   }
 
   try {
     const { prompt, wallet } = req.body;
 
     if (!prompt) {
-      return res.status(400).json({ message: 'Prompt is required' });
+      return res.status(400).json({ 
+        success: false,
+        message: 'Prompt is required' 
+      });
     }
 
     if (!wallet) {
-      return res.status(400).json({ message: 'Wallet address is required' });
+      return res.status(400).json({ 
+        success: false,
+        message: 'Wallet address is required' 
+      });
     }
+
+    // Test database connection
+    await prisma.$connect();
 
     const user = await prisma.user.findUnique({
       where: { wallet },
     });
 
     if (!user) {
-      return res.status(404).json({ message: 'User not found' });
+      return res.status(404).json({ 
+        success: false,
+        message: 'User not found' 
+      });
     }
 
     // Add timeout for Replicate API
@@ -80,12 +94,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             num_outputs: 1,
             scheduler: "K_EULER",
             num_inference_steps: 50,
-            guidance_scale: 7.5,        // Increased for better prompt adherence
+            guidance_scale: 7.5,
             prompt_strength: 0.8,
             refine: "expert_ensemble_refiner",
             high_noise_frac: 0.8,
             apply_watermark: false,
-            lora_scale: 0.8             // Increased for stronger style influence
+            lora_scale: 0.8
           }
         }),
         timeoutPromise
