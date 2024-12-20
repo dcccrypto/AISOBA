@@ -1,5 +1,6 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { PrismaClient } from '@prisma/client';
+import { ipfsToHttp } from '../../utils/ipfs';
 
 const prisma = new PrismaClient();
 
@@ -20,11 +21,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(404).json({ message: 'User not found' });
     }
 
+    // Convert to IPFS URL format if it's not already
+    const ipfsUrl = imageUrl.startsWith('ipfs://') ? imageUrl : imageUrl;
+    const httpUrl = ipfsToHttp(ipfsUrl);
+
     // Record NFT
     const nftRecord = await prisma.nFT.create({
       data: {
         mintAddress,
-        imageUrl,
+        imageUrl: ipfsUrl,
+        httpUrl: httpUrl,
         userId: user.id,
       },
     });
