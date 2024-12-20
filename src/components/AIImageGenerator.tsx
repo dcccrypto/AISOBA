@@ -86,9 +86,6 @@ export default function AIImageGenerator({ onImageGenerated }: AIImageGeneratorP
     setError(null);
 
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 90000);
-
       const response = await fetch('/api/generate-image', {
         method: 'POST',
         headers: { 
@@ -99,35 +96,25 @@ export default function AIImageGenerator({ onImageGenerated }: AIImageGeneratorP
           prompt: prompt.trim(),
           wallet: publicKey.toString(),
         }),
-        signal: controller.signal
       });
-      
-      clearTimeout(timeoutId);
       
       const data = await response.json();
       
-      if (!response.ok) {
-        throw new Error(data.error || data.message || 'Failed to generate image');
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || 'Failed to generate image');
       }
       
-      if (data.imageUrl) {
-        setDownloadUrl(data.imageUrl);
-        onImageGenerated(data.imageUrl);
-        await checkGenerationLimit();
-      } else {
+      if (!data.imageUrl) {
         throw new Error('No image URL in response');
       }
-    } catch (error: unknown) {
+
+      setDownloadUrl(data.imageUrl);
+      onImageGenerated(data.imageUrl);
+      await checkGenerationLimit();
+
+    } catch (error) {
       console.error('Error generating image:', error);
-      if (error instanceof Error) {
-        if (error.name === 'AbortError') {
-          setError('Request timed out. Please try again.');
-        } else {
-          setError(error.message);
-        }
-      } else {
-        setError('Error generating image');
-      }
+      setError(error instanceof Error ? error.message : 'Failed to generate image');
     } finally {
       setGenerating(false);
     }

@@ -85,15 +85,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       let finalPrediction = await replicate.wait(prediction);
       console.log('Final prediction:', finalPrediction);
 
+      // Add type checking for the prediction response
+      if (!isReplicatePrediction(finalPrediction)) {
+        throw new Error('Invalid prediction response format');
+      }
+
+      // Check for API-level errors
+      if (finalPrediction.status === 'failed') {
+        throw new Error(finalPrediction.error || 'Model prediction failed');
+      }
+
       if (!finalPrediction.output || !Array.isArray(finalPrediction.output)) {
-        console.error('Invalid prediction output:', finalPrediction);
         throw new Error('Model did not return a valid output');
       }
 
       const imageUrl = finalPrediction.output[0];
 
       if (!imageUrl || typeof imageUrl !== 'string' || !imageUrl.startsWith('http')) {
-        console.error('Invalid image URL:', imageUrl);
         throw new Error('Model returned an invalid image URL');
       }
 
@@ -106,22 +114,33 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         },
       });
 
-      return res.status(200).json({ imageUrl });
+      return res.status(200).json({ 
+        success: true,
+        imageUrl 
+      });
 
     } catch (apiError) {
+      // Properly format API errors
       console.error('Replicate API Error:', apiError);
-      const errorMessage = apiError instanceof Error ? apiError.message : 'Unknown API error';
-      return res.status(500).json({ 
-        message: 'Failed to generate image. Please try again.',
-        error: errorMessage,
-        details: JSON.stringify(apiError, null, 2)
-      });
+      
+      // Handle ReplicateError type
+      if (apiError && typeof apiError === 'object' && 'detail' in apiError) {
+        const replicateError = apiError as ReplicateError;
+        throw new Error(replicateError.detail || replicateError.message || 'API Error');
+      }
+      
+      throw apiError; // Re-throw if not a ReplicateError
     }
   } catch (error) {
     console.error('Server Error:', error);
+    
+    // Properly format the error response
     return res.status(500).json({ 
-      message: 'Server error. Please try again later.',
-      error: error instanceof Error ? error.message : 'Unknown server error'
+      success: false,
+      message: error instanceof Error ? error.message : 'An unexpected error occurred',
+      error: process.env.NODE_ENV === 'development' ? 
+        error instanceof Error ? error.stack : String(error) 
+        : undefined
     });
   } finally {
     await prisma.$disconnect();
