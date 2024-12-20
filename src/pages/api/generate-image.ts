@@ -3,7 +3,6 @@ import { PrismaClient } from '@prisma/client';
 import Replicate from 'replicate';
 import { Prediction } from 'replicate';
 import { ReplicatePrediction, ReplicateError } from '../../types/replicate';
-import { uploadToIPFS, ipfsToHttp } from '../../utils/ipfs';
 
 const prisma = new PrismaClient();
 const replicate = new Replicate({
@@ -148,30 +147,24 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         throw new Error('Model did not return a valid output');
       }
 
-      const replicateImageUrl = finalPrediction.output[0];
+      const imageUrl = finalPrediction.output[0];
 
-      if (!replicateImageUrl || typeof replicateImageUrl !== 'string' || !replicateImageUrl.startsWith('http')) {
+      if (!imageUrl || typeof imageUrl !== 'string' || !imageUrl.startsWith('http')) {
         throw new Error('Model returned an invalid image URL');
       }
 
-      // After getting the temporary URL from Replicate
-      const ipfsUrl = await uploadToIPFS(replicateImageUrl);
-      const httpUrl = ipfsToHttp(ipfsUrl);
-
-      // Store the generation in the database with IPFS URL
+      // Create the database record
       await prisma.imageGeneration.create({
         data: {
           userId: user.id,
-          prompt: enhancedPrompt,
-          imageUrl: ipfsUrl,
-          httpUrl: httpUrl,
+          imageUrl,
+          prompt,
         },
       });
 
       return res.status(200).json({ 
         success: true,
-        imageUrl: httpUrl,
-        ipfsUrl: ipfsUrl
+        imageUrl 
       });
 
     } catch (apiError: any) {
