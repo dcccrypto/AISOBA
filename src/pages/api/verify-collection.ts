@@ -68,6 +68,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ message: 'Mint address is required' });
     }
 
+    // First find the NFT by mintAddress
+    const nft = await prisma.nFT.findFirst({
+      where: { mintAddress },
+    });
+
+    if (!nft) {
+      return res.status(404).json({ message: 'NFT not found' });
+    }
+
     // Initialize connection with commitment
     const connection = new Connection(
       process.env.NEXT_PUBLIC_SOLANA_NETWORK === 'mainnet' 
@@ -153,9 +162,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       throw new Error(`Transaction failed: ${confirmation.value.err.toString()}`);
     }
 
-    // Update NFT record in database
+    // Update NFT record using the id
     await prisma.nFT.update({
-      where: { mintAddress },
+      where: { id: nft.id },
       data: { verified: true },
     });
 
