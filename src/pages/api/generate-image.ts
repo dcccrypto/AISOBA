@@ -155,7 +155,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
 
       // Upload to IPFS and store both URLs
-      const ipfsUrl = await uploadToIPFS(imageUrl);
+      let ipfsUrl = '';
+      try {
+        ipfsUrl = await uploadToIPFS(imageUrl);
+      } catch (ipfsError) {
+        console.error('Error uploading to IPFS:', ipfsError);
+        // Continue with HTTP URL only if IPFS upload fails
+        ipfsUrl = imageUrl; // Fallback to HTTP URL
+      }
       
       // Create the database record with both URLs
       const imageGeneration = await prisma.imageGeneration.create({

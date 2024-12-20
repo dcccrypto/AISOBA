@@ -1,6 +1,12 @@
 import { NFTStorage } from 'nft.storage';
 
-const client = new NFTStorage({ token: process.env.NFT_STORAGE_TOKEN! });
+// Add error checking for the token
+const NFT_STORAGE_TOKEN = process.env.NFT_STORAGE_TOKEN;
+if (!NFT_STORAGE_TOKEN) {
+  throw new Error('NFT_STORAGE_TOKEN is not configured');
+}
+
+const client = new NFTStorage({ token: NFT_STORAGE_TOKEN });
 
 /**
  * Converts an HTTP URL to IPFS URL format
@@ -12,13 +18,27 @@ export async function uploadToIPFS(imageUrl: string): Promise<string> {
     if (!response.ok) {
       throw new Error('Failed to fetch image');
     }
+    
     const imageBlob = await response.blob();
+    
+    // Validate blob
+    if (imageBlob.size === 0) {
+      throw new Error('Empty image blob');
+    }
 
     // Upload to IPFS via NFT.Storage
     const cid = await client.storeBlob(imageBlob);
+    if (!cid) {
+      throw new Error('Failed to get CID from NFT.Storage');
+    }
+
     return `ipfs://${cid}`;
   } catch (error) {
-    console.error('Error uploading to IPFS:', error);
+    console.error('Detailed IPFS Upload Error:', {
+      error,
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined
+    });
     throw new Error('Failed to store image on IPFS');
   }
 }
