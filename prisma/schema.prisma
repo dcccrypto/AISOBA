@@ -20,19 +20,20 @@ model User {
 model ImageGeneration {
   id        String   @id @default(cuid())
   userId    String
-  user      User     @relation(fields: [userId], references: [id])
-  imageUrl  String
   prompt    String
+  imageUrl  String   // IPFS URL (ipfs://...)
+  httpUrl   String   // HTTP Gateway URL
   createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
 }
 
 model NFT {
-  id                String   @id @default(cuid())
-  mintAddress      String   @unique
-  imageUrl         String
-  userId           String
-  user             User     @relation(fields: [userId], references: [id])
-  verified         Boolean  @default(false)
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  id          String   @id @default(cuid())
+  userId      String
+  title       String?
+  imageUrl    String   // IPFS URL (ipfs://...)
+  httpUrl     String   // HTTP Gateway URL
+  mintAddress String?
+  createdAt   DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id])
 } 

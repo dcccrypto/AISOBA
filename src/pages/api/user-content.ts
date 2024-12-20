@@ -1,5 +1,6 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { prisma } from '../../lib/db';
+import { ipfsToHttp } from '../../utils/ipfs';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
@@ -26,7 +27,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         where: { userId: user.id },
         orderBy: { createdAt: 'desc' },
       });
-      return res.status(200).json({ nfts });
+      const processedNfts = nfts.map(nft => ({
+        ...nft,
+        imageUrl: ipfsToHttp(nft.imageUrl),
+      }));
+      return res.status(200).json({ nfts: processedNfts });
     }
 
     if (type === 'images') {
@@ -34,7 +39,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         where: { userId: user.id },
         orderBy: { createdAt: 'desc' },
       });
-      return res.status(200).json({ images });
+      const processedImages = images.map(image => ({
+        ...image,
+        imageUrl: ipfsToHttp(image.imageUrl),
+      }));
+      return res.status(200).json({ images: processedImages });
     }
 
     return res.status(400).json({ message: 'Invalid content type' });

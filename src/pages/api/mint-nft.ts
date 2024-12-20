@@ -38,7 +38,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       seller_fee_basis_points: 500, // 5% royalty
     };
 
-    // Return the metadata and instructions for frontend to handle
+    // Return the metadata for frontend to handle
     res.status(200).json({ 
       metadata,
       connection: connection.rpcEndpoint
