@@ -6,6 +6,7 @@ import NFTMinter from '../components/NFTMinter';
 import dynamic from 'next/dynamic';
 import Layout from '../components/Layout';
 import { toast } from 'react-hot-toast';
+import SobaTickerBadge from '../components/SobaTickerBadge';
 
 // Dynamically import WalletMultiButton to avoid SSR issues
 const WalletMultiButtonDynamic = dynamic(
@@ -36,6 +37,11 @@ export default function Home() {
           </div>
 
           <div className="relative">
+            {/* Add ticker in prominent position */}
+            <div className="flex justify-center mb-8">
+              <SobaTickerBadge />
+            </div>
+
             <div className="text-center mb-12">
               <div className="inline-block">
                 <span className="inline-block text-sm font-medium text-[#ff6b00] bg-[#ff6b00]/10 px-4 py-1 rounded-full mb-4">

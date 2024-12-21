@@ -8,25 +8,23 @@ interface TokenPrice {
 
 async function fetchTokenPrice(): Promise<TokenPrice> {
   try {
-    // Jupiter API for more reliable price data
-    const response = await fetch('https://price.jup.ag/v4/price?ids=soba');
+    const response = await fetch('https://public-api.birdeye.so/defi/v3/token/market-data?address=25p2BoNp6qrJH5As6ek6H7Ei495oSkyZd3tGb97sqFmH', {
+      method: 'GET',
+      headers: {
+        'X-API-KEY': 'fd1a074f532e410e805dc42913d1605c',
+        'accept': 'application/json',
+        'x-chain': 'solana'
+      }
+    });
+    
+    if (!response.ok) throw new Error('Failed to fetch price');
+    
     const data = await response.json();
-    
-    if (!data.data.soba) {
-      throw new Error('Price data not available');
-    }
-
-    // Calculate 24h change using Jupiter's data
-    const price = data.data.soba.price;
-    
-    // Fallback to coingecko for 24h change
-    const cgResponse = await fetch('https://api.coingecko.com/api/v3/simple/token_price/solana?contract_addresses=25p2BoNp6qrJH5As6ek6H7Ei495oSkyZd3tGb97sqFmH&vs_currencies=usd&include_24hr_change=true');
-    const cgData = await cgResponse.json();
-    const change24h = cgData['25p2BoNp6qrJH5As6ek6H7Ei495oSkyZd3tGb97sqFmH']?.usd_24h_change || 0;
+    if (!data.success) throw new Error('API response not successful');
 
     return {
-      price,
-      change24h
+      price: data.data?.price || 0,
+      change24h: 0
     };
   } catch (error) {
     console.error('Error fetching price:', error);
@@ -41,8 +39,12 @@ export default function SobaTickerBadge() {
   const { data: priceData, isLoading } = useQuery({
     queryKey: ['sobaPrice'],
     queryFn: fetchTokenPrice,
-    refetchInterval: 30000, // Refetch every 30 seconds
-    initialData: { price: 0, change24h: 0 }
+    refetchInterval: 30000,
+    initialData: { price: 0, change24h: 0 },
+    retry: 2,
+    staleTime: 15000,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true
   });
 
   const formatPrice = (price: number) => {
@@ -52,24 +54,22 @@ export default function SobaTickerBadge() {
 
   const formatChange = (change: number) => {
     const sign = change >= 0 ? '+' : '';
-    return `${sign}${change.toFixed(1)}%`;
+    return `${sign}${change.toFixed(2)}%`;
   };
 
   return (
-    <div className="fixed bottom-4 right-4 z-50">
-      <a 
-        href="https://jup.ag/swap/SOL-soba"
+    <div className="inline-block">
+      <a
+        href="https://jup.ag/swap/soba-SOL"
         target="_blank"
         rel="noopener noreferrer"
-        className="flex items-center gap-2 bg-[#1a1a1a] border border-[#ff6b00]/20 rounded-full px-4 py-2 hover:bg-[#2a2a2a] transition-all group"
+        className="flex items-center gap-2 bg-[#1a1a1a] px-3 py-1.5 rounded-full border border-[#ff6b00]/10 hover:border-[#ff6b00]/20 transition-colors group"
       >
-        <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-        <span className="text-[#ff6b00] font-bold">$SOBA</span>
         {isLoading ? (
-          <span className="text-white animate-pulse">Loading...</span>
+          <span className="text-gray-400">Loading...</span>
         ) : (
           <>
-            <span className="text-white">
+            <span className="font-medium text-white">
               {formatPrice(priceData.price)}
             </span>
             <span className={`text-sm ${priceData.change24h >= 0 ? 'text-green-500' : 'text-red-500'}`}>
