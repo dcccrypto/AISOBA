@@ -50,39 +50,18 @@ body {
 
 /* Custom input styles */
 .input-primary {
-  @apply w-full p-2 border rounded bg-[#2a2a2a] border-[#ff6b00] 
-         text-white focus:outline-none focus:ring-2 
-         focus:ring-[#ff6b00] transition-colors duration-200;
+  @apply w-full px-4 py-3 bg-[#1a1a1a] border border-[#ff6b00]/20
+         rounded-lg text-white placeholder-gray-400
+         focus:outline-none focus:border-[#ff6b00]/40
+         transition-all duration-300;
 }
 
 /* Card styles */
 .card {
   @apply p-6 rounded-lg bg-[#2a2a2a] border border-[#ff6b00]/20
          transition-all duration-300 hover:border-[#ff6b00]/40
-         animate-fadeIn shadow-lg;
-  
-  /* Improved hover state */
-  &:hover {
-    @apply shadow-xl shadow-[#ff6b00]/10 transform-gpu scale-[1.01];
-  }
-}
-
-/* Animation classes */
-.animate-fadeIn {
-  animation: fadeIn 0.5s ease-out;
-}
-
-.animate-glow {
-  animation: glow 2s infinite;
-}
-
-.animate-pulse {
-  animation: pulse 2s infinite;
-}
-
-/* Responsive container */
-.responsive-container {
-  @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+         animate-fadeIn shadow-lg hover:shadow-xl hover:shadow-[#ff6b00]/10
+         hover:scale-[1.01];
 }
 
 /* Image container */
@@ -97,7 +76,7 @@ body {
 
 .preview-badge {
   @apply absolute top-2 right-2 bg-black/70 px-3 py-1 rounded-full 
-  text-xs text-white z-10;
+         text-xs text-white z-10;
 }
 
 /* Wallet button override */
@@ -145,22 +124,29 @@ body {
 .image-container {
   @apply relative overflow-hidden rounded-lg bg-[#2a2a2a]
          transition-all duration-300 group;
+}
 
-  &::before {
-    @apply content-[''] absolute inset-0 bg-gradient-to-t
-           from-black/50 to-transparent opacity-0 transition-opacity
-           duration-300 z-10;
-  }
+.image-container::before {
+  @apply content-[''] absolute inset-0 bg-gradient-to-t
+         from-black/50 to-transparent opacity-0 transition-opacity
+         duration-300 z-10;
+}
 
-  &:hover::before {
-    @apply opacity-100;
-  }
+.image-container:hover::before {
+  @apply opacity-100;
 }
 
 /* Enhanced loading states */
 .skeleton {
   @apply animate-pulse bg-gradient-to-r from-[#2a2a2a] via-[#3a3a3a] to-[#2a2a2a]
-         background-animate rounded-lg;
+         rounded-lg;
+}
+
+/* Add background animation */
+@keyframes background-animate {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
 }
   </rewritten_file>
   
