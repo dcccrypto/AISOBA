@@ -40,6 +40,7 @@ export default function NFTMinter({ imageUrl, onSuccess }: NFTMinterProps) {
   const [isProcessing, setIsProcessing] = useState(true);
   const [isPreviewMode, setIsPreviewMode] = useState(false);
   const [selectedOverlay, setSelectedOverlay] = useState('/nft/nftoverlay.png');
+  const [imageLoaded, setImageLoaded] = useState(false);
 
   const overlayOptions = [
     { id: 1, path: '/nft/nftoverlay.png', name: 'Classic Frame' },
@@ -259,29 +260,35 @@ export default function NFTMinter({ imageUrl, onSuccess }: NFTMinterProps) {
           </button>
         </div>
 
-        <div className="relative group">
-          {isProcessing ? (
-            <div className="w-full h-64 flex items-center justify-center bg-gray-800 rounded-lg">
-              <div className="loading-spinner" />
-            </div>
-          ) : (
-            <div className="relative">
-              <div className="image-preview overflow-hidden rounded-lg">
-                <img 
-                  src={isPreviewMode ? processedImageUrl : imageUrl} 
-                  alt={isPreviewMode ? "NFT preview" : "Original artwork"} 
-                  className="w-full h-auto transform transition-transform duration-300 group-hover:scale-105"
-                />
-              </div>
-              {isPreviewMode && (
-                <div className="absolute top-2 right-2 bg-black/70 px-3 py-1 rounded-full">
-                  <p className="text-xs text-white">NFT Preview</p>
-                </div>
-              )}
+        <div className="image-container aspect-square">
+          {!imageLoaded && (
+            <div className="absolute inset-0 flex items-center justify-center bg-[#1a1a1a]/80 z-20">
+              <div className="loading-spinner w-8 h-8"></div>
             </div>
           )}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-lg flex items-end justify-center p-4">
-            <p className="text-white text-sm">
+          <img 
+            src={processedImageUrl} 
+            alt={isPreviewMode ? "NFT preview" : "Original artwork"} 
+            className={`w-full h-full object-cover transition-all duration-500 ${
+              imageLoaded ? 'opacity-100 scale-100' : 'opacity-0 scale-95'
+            }`}
+            onLoad={() => setImageLoaded(true)}
+          />
+          
+          {isPreviewMode && (
+            <div className="absolute top-2 right-2 bg-black/70 px-3 py-1 rounded-full
+                            backdrop-blur-sm transform-gpu translate-y-2 opacity-0
+                            group-hover:translate-y-0 group-hover:opacity-100
+                            transition-all duration-300 z-20">
+              <p className="text-xs text-white font-medium">NFT Preview</p>
+            </div>
+          )}
+          
+          <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent
+                          opacity-0 group-hover:opacity-100 transition-opacity duration-300
+                          flex items-end justify-center p-6 z-10">
+            <p className="text-white text-sm text-center transform-gpu translate-y-4
+                          group-hover:translate-y-0 transition-all duration-300">
               {isPreviewMode ? 'Preview of your NFT with overlay' : 'Click Preview NFT to see how it will look'}
             </p>
           </div>
