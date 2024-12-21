@@ -53,8 +53,12 @@ body {
 
 /* Enhanced image container */
 .image-container {
-  @apply relative overflow-hidden rounded-lg bg-[#2a2a2a]
-         transition-all duration-300 group;
+  position: relative;
+  overflow: hidden;
+  border-radius: 0.5rem;
+  background-color: #2a2a2a;
+  transition-property: all;
+  transition-duration: 300ms;
 }
 
 .image-container::before {
