@@ -1,4 +1,3 @@
-import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
 interface TokenPrice {
@@ -6,72 +5,43 @@ interface TokenPrice {
   change24h: number;
 }
 
-async function fetchTokenPrice(): Promise<TokenPrice> {
-  try {
-    const response = await fetch('/api/token-price');
-    
-    if (!response.ok) throw new Error('Failed to fetch price');
-    
-    const data = await response.json();
-    return {
-      price: data.price || 0,
-      change24h: data.change24h || 0
-    };
-  } catch (error) {
-    console.error('Error fetching price:', error);
-    return {
-      price: 0,
-      change24h: 0
-    };
-  }
-}
-
 export default function SobaTickerBadge() {
-  const { data: priceData, isLoading } = useQuery({
-    queryKey: ['sobaPrice'],
-    queryFn: fetchTokenPrice,
-    refetchInterval: 30000,
-    initialData: { price: 0, change24h: 0 },
-    retry: 2,
-    staleTime: 15000,
-    refetchOnMount: true,
-    refetchOnWindowFocus: true
+  const { data: tokenPrice, isLoading } = useQuery<TokenPrice>({
+    queryKey: ['tokenPrice'],
+    queryFn: async () => {
+      const response = await fetch('/api/token-price');
+      if (!response.ok) throw new Error('Failed to fetch price');
+      return response.json();
+    },
+    refetchInterval: 30000, // Refetch every 30 seconds
+    staleTime: 15000, // Consider data stale after 15 seconds
+    retry: 3,
+    initialData: { price: 0, change24h: 0 }
   });
 
-  const formatPrice = (price: number) => {
-    if (price < 0.0001) return '<$0.0001';
-    return `$${price.toFixed(4)}`;
-  };
+  if (isLoading) {
+    return (
+      <div className="animate-pulse bg-gray-800 rounded px-3 py-1">
+        Loading...
+      </div>
+    );
+  }
 
-  const formatChange = (change: number) => {
-    const sign = change >= 0 ? '+' : '';
-    return `${sign}${change.toFixed(2)}%`;
-  };
+  const formattedPrice = new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 4,
+    maximumFractionDigits: 4
+  }).format(tokenPrice.price);
+
+  const changeColor = tokenPrice.change24h >= 0 ? 'text-green-500' : 'text-red-500';
 
   return (
-    <div className="inline-block">
-      <a
-        href="https://jup.ag/swap/soba-SOL"
-        target="_blank"
-        rel="noopener noreferrer"
-        className="flex items-center gap-2 bg-[#1a1a1a] px-3 py-1.5 rounded-full border border-[#ff6b00]/10 hover:border-[#ff6b00]/20 transition-colors group"
-      >
-        {isLoading ? (
-          <span className="text-gray-400">Loading...</span>
-        ) : (
-          <>
-            <span className="font-medium text-white">
-              {formatPrice(priceData.price)}
-            </span>
-            <span className={`text-sm ${priceData.change24h >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-              {formatChange(priceData.change24h)}
-            </span>
-          </>
-        )}
-        <svg className="w-4 h-4 text-[#ff6b00] group-hover:translate-x-1 transition-transform" fill="currentColor" viewBox="0 0 20 20">
-          <path fillRule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clipRule="evenodd" />
-        </svg>
-      </a>
+    <div className="bg-gray-800 rounded px-3 py-1 flex items-center space-x-2">
+      <span>{formattedPrice}</span>
+      <span className={changeColor}>
+        {tokenPrice.change24h >= 0 ? '+' : ''}{tokenPrice.change24h.toFixed(2)}%
+      </span>
     </div>
   );
 } 
