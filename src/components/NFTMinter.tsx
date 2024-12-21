@@ -63,7 +63,7 @@ export default function NFTMinter({ imageUrl, onClose, onSuccess, className = ""
         
         try {
           const account: Account = await getAccount(connection, tokenAccount);
-          const balance = Number(account.amount) / 1e9;
+          const balance = Number(account.amount) / 1e6;
           setSobaBalance(balance);
         } catch (e) {
           setSobaBalance(0);

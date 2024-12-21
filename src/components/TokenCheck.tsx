@@ -39,7 +39,7 @@ export default function TokenCheck({ requiredAmount, onVerification }: TokenChec
 
         try {
           const account = await getAccount(connection, tokenAccount);
-          // Convert from raw amount (considering 9 decimals)
+          // Convert from raw amount (considering 6 decimals)
           const rawBalance = Number(account.amount);
           const balance = rawBalance / 1e6; // Divide by 10^6 for proper decimal handling
           setTokenBalance(balance);
