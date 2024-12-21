@@ -7,6 +7,7 @@ import dynamic from 'next/dynamic';
 import Layout from '../components/Layout';
 import { toast } from 'react-hot-toast';
 import SobaTickerBadge from '../components/SobaTickerBadge';
+import Link from 'next/link';
 
 // Dynamically import WalletMultiButton to avoid SSR issues
 const WalletMultiButtonDynamic = dynamic(
@@ -56,12 +57,12 @@ export default function Home() {
                 bastard community and stand out with your one-of-a-kind SOBA PFP.
               </p>
               <div className="flex justify-center gap-4">
-                <a 
-                  href="#create"
+                <Link 
+                  href="/create"
                   className="btn-primary px-8 py-3 text-lg"
                 >
                   Start Creating
-                </a>
+                </Link>
                 <a 
                   href="https://jup.ag/swap/SOL-soba"
                   target="_blank"

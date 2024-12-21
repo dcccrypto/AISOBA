@@ -37,4 +37,15 @@ model NFT {
   verified    Boolean  @default(false)
   createdAt   DateTime @default(now())
   user        User     @relation(fields: [userId], references: [id])
+}
+
+model GeneratedImage {
+  id          String   @id @default(cuid())
+  imageUrl    String
+  createdAt   DateTime @default(now())
+  creator     String
+  frameType   String
+  mintAddress String?  @unique
+  
+  @@index([createdAt(sort: Desc)])
 } 
