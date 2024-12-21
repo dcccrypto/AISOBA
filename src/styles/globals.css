@@ -101,8 +101,12 @@ body {
 .modal-content {
   @apply bg-[#2a2a2a] rounded-lg w-full max-w-2xl mx-auto
          transform transition-all duration-300
-         scale-95 opacity-0 animate-in
-         data-[state=open]:scale-100 data-[state=open]:opacity-100;
+         scale-95 opacity-0;
+}
+
+/* Add animation states for modal */
+.modal-content[data-state="open"] {
+  @apply scale-100 opacity-100;
 }
 
 .modal-header {
@@ -237,8 +241,7 @@ body {
 /* Enhance existing modal styles */
 .modal-content {
   @apply bg-[#2a2a2a] rounded-lg p-6 max-w-2xl w-full mx-4
-         relative transform transition-all duration-300
-         scale-95 opacity-0 animate-in;
+         relative transform transition-all duration-300;
 }
 
 /* Loading container */
@@ -258,5 +261,21 @@ body {
 
 .image-loading {
   @apply opacity-0 scale-95;
+}
+
+/* Add animation keyframes */
+@keyframes modalIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.modal-enter {
+  animation: modalIn 0.3s ease-out forwards;
 }
   
