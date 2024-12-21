@@ -41,7 +41,7 @@ export default function SobaTickerBadge() {
 
   if (isLoading) {
     return (
-      <div className="animate-pulse bg-[#2a2a2a] rounded-lg px-4 py-2 text-sm">
+      <div className="animate-pulse bg-[#2a2a2a] rounded-lg px-3 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm">
         Loading...
       </div>
     );
@@ -57,10 +57,10 @@ export default function SobaTickerBadge() {
   const changeColor = tokenPrice.change24h >= 0 ? 'text-green-500' : 'text-red-500';
 
   return (
-    <div className="bg-[#2a2a2a] rounded-lg px-4 py-2 flex items-center space-x-3 border border-[#ff6b00]/10">
-      <span className="text-sm font-medium text-white">$SOBA</span>
-      <span className="text-sm text-gray-300">{formattedPrice}</span>
-      <span className={`text-sm ${changeColor}`}>
+    <div className="bg-[#2a2a2a] rounded-lg px-3 py-1.5 sm:px-4 sm:py-2 flex items-center space-x-2 sm:space-x-3 border border-[#ff6b00]/10">
+      <span className="text-xs sm:text-sm font-medium text-white">$SOBA</span>
+      <span className="text-xs sm:text-sm text-gray-300">{formattedPrice}</span>
+      <span className={`text-xs sm:text-sm ${changeColor}`}>
         {tokenPrice.change24h >= 0 ? '+' : ''}{tokenPrice.change24h.toFixed(2)}%
       </span>
     </div>
