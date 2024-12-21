@@ -20,6 +20,8 @@ import {
   createAssociatedTokenAccountInstruction,
   getAssociatedTokenAddress,
   createMintToInstruction,
+  getAccount,
+  Account
 } from '@solana/spl-token';
 import { applyOverlay } from '../utils/imageProcessing';
 
@@ -27,25 +29,53 @@ interface NFTMinterProps {
   imageUrl: string;
   onClose: () => void;
   onSuccess?: () => void;
+  className?: string;
 }
 
 // Update the collection address constant with your new collection's address
 const COLLECTION_ADDRESS = new PublicKey('JBvMgUVSD9oQiwcfQx932CCbheaRpmiSFoLpESwzGeyn');
 
-export default function NFTMinter({ imageUrl, onClose, onSuccess }: NFTMinterProps) {
+export default function NFTMinter({ imageUrl, onClose, onSuccess, className = "" }: NFTMinterProps) {
   const { publicKey, signTransaction } = useWallet();
   const { connection } = useConnection();
   const [selectedOverlay, setSelectedOverlay] = useState<string | null>(null);
   const [isMinting, setIsMinting] = useState(false);
   const [previewImage, setPreviewImage] = useState<string>(imageUrl);
+  const [sobaBalance, setSobaBalance] = useState<number>(0);
 
   const overlayOptions = [
-    { id: 1, path: '/nft/nftoverlay.png', name: 'Classic Frame' },
-    { id: 2, path: '/nft/nftoverlay2.png', name: 'Modern Frame' },
-    { id: 3, path: '/nft/nftoverlay3.png', name: 'Elegant Frame' },
-    { id: 4, path: '/nft/nftoverlay4.png', name: 'Minimal Frame' },
-    { id: 5, path: '/nft/nftoverlay5.png', name: 'Premium Frame' },
+    { id: 1, path: '/nft/nftoverlay.png', name: 'Basic Frame', required: 0 },
+    { id: 2, path: '/nft/nftoverlay2.png', name: 'Modern Frame', required: 200000 },
+    { id: 3, path: '/nft/nftoverlay3.png', name: 'Elegant Frame', required: 300000 },
+    { id: 4, path: '/nft/nftoverlay4.png', name: 'Minimal Frame', required: 400000 },
+    { id: 5, path: '/nft/nftoverlay5.png', name: 'Premium Frame', required: 500000 },
+    { id: 6, path: '/nft/nftoverlay6.png', name: 'Legendary Frame', required: 1000000 }
   ];
+
+  // Check SOBA balance
+  useEffect(() => {
+    async function checkBalance() {
+      if (!publicKey) return;
+      
+      try {
+        const sobaTokenMint = new PublicKey('25p2BoNp6qrJH5As6ek6H7Ei495oSkyZd3tGb97sqFmH');
+        const tokenAccount = await getAssociatedTokenAddress(sobaTokenMint, publicKey);
+        
+        try {
+          const account: Account = await getAccount(connection, tokenAccount);
+          const balance = Number(account.amount) / 1e9;
+          setSobaBalance(balance);
+        } catch (e) {
+          setSobaBalance(0);
+        }
+      } catch (error) {
+        console.error('Error checking SOBA balance:', error);
+        setSobaBalance(0);
+      }
+    }
+
+    checkBalance();
+  }, [publicKey, connection]);
 
   // Updated frame overlay effect
   useEffect(() => {
@@ -151,64 +181,42 @@ export default function NFTMinter({ imageUrl, onClose, onSuccess }: NFTMinterPro
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/50 flex items-center justify-center p-4">
-      <div className="relative w-full max-w-6xl bg-[#2a2a2a] rounded-lg shadow-xl">
-        <button 
-          onClick={onClose}
-          className="absolute right-4 top-4 text-gray-400 hover:text-white transition-colors z-10"
-        >
-          <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
-
-        <div className="flex flex-col md:flex-row max-h-[90vh]">
+    <div className={`bg-[#1a1a1a] rounded-lg border border-[#ff6b00]/10 ${className}`}>
+      <div className="p-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Preview section */}
-          <div className="md:w-1/2 p-6 flex-shrink-0">
-            <div className="aspect-square rounded-lg overflow-hidden bg-[#1a1a1a]">
-              <img 
-                src={previewImage} 
-                alt="SOBA Chimp Preview" 
+          <div className="space-y-4">
+            <h2 className="text-2xl font-bold text-white">Preview</h2>
+            <div className="aspect-square relative rounded-lg overflow-hidden bg-[#2a2a2a]">
+              <img
+                src={previewImage}
+                alt="NFT Preview"
                 className="w-full h-full object-contain"
               />
-            </div>
-            
-            {/* Download and Share buttons */}
-            <div className="flex gap-4 mt-4">
-              <button 
-                onClick={handleDownload}
-                className="flex-1 px-4 py-2 bg-[#1a1a1a] text-white rounded-lg hover:bg-[#ff6b00]/10 transition-colors"
-              >
-                Download
-              </button>
-              <button 
-                onClick={handleShare}
-                className="flex-1 px-4 py-2 bg-[#1a1a1a] text-white rounded-lg hover:bg-[#ff6b00]/10 transition-colors"
-              >
-                Share
-              </button>
             </div>
           </div>
 
           {/* Frame selection section */}
-          <div className="md:w-1/2 p-6 overflow-y-auto border-t md:border-t-0 md:border-l border-[#ff6b00]/10">
-            <div className="space-y-6">
-              <div>
-                <h2 className="text-2xl font-bold text-white mb-2">
-                  Select Frame
-                </h2>
-                <p className="text-gray-400">
-                  Choose a frame for your SOBA chimp NFT
-                </p>
-              </div>
+          <div className="space-y-6">
+            <div>
+              <h2 className="text-2xl font-bold text-white mb-2">Select Frame</h2>
+              <p className="text-gray-400">Your SOBA Balance: {sobaBalance.toLocaleString()} $SOBA</p>
+            </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                {overlayOptions.map((overlay) => (
+            <div className="grid grid-cols-2 gap-4">
+              {overlayOptions.map((overlay) => {
+                const canUse = sobaBalance >= overlay.required;
+                return (
                   <button
                     key={overlay.id}
-                    onClick={() => setSelectedOverlay(overlay.path)}
-                    className={`p-4 rounded-lg border border-[#ff6b00]/10 hover:border-[#ff6b00]/30 bg-[#1a1a1a] text-white transition-colors ${
-                      selectedOverlay === overlay.path ? 'border-[#ff6b00] bg-[#ff6b00]/10' : ''
+                    onClick={() => canUse && setSelectedOverlay(overlay.path)}
+                    disabled={!canUse}
+                    className={`p-4 rounded-lg border transition-colors ${
+                      !canUse 
+                        ? 'border-red-500/10 bg-red-500/5 opacity-50 cursor-not-allowed' 
+                        : selectedOverlay === overlay.path
+                        ? 'border-[#ff6b00] bg-[#ff6b00]/10'
+                        : 'border-[#ff6b00]/10 hover:border-[#ff6b00]/30 bg-[#2a2a2a]'
                     }`}
                   >
                     <img
@@ -219,23 +227,21 @@ export default function NFTMinter({ imageUrl, onClose, onSuccess }: NFTMinterPro
                     <p className="text-xs mt-1 text-center text-gray-400">
                       {overlay.name}
                     </p>
+                    <p className="text-xs mt-1 text-center text-gray-500">
+                      {overlay.required.toLocaleString()} $SOBA
+                    </p>
                   </button>
-                ))}
-              </div>
-
-              <div className="pt-6">
-                <button 
-                  onClick={handleMint}
-                  disabled={isMinting}
-                  className="w-full bg-[#ff6b00] hover:bg-[#ff8533] disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-3 px-6 rounded-lg transition-colors"
-                >
-                  {isMinting ? 'Minting...' : 'Mint NFT'}
-                </button>
-                <p className="text-sm text-gray-400 mt-2 text-center">
-                  Gas fees will apply
-                </p>
-              </div>
+                );
+              })}
             </div>
+
+            <button
+              onClick={handleMint}
+              disabled={isMinting}
+              className="w-full btn-primary"
+            >
+              {isMinting ? 'Minting...' : 'Mint NFT'}
+            </button>
           </div>
         </div>
       </div>

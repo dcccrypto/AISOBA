@@ -142,14 +142,15 @@ export default function Home() {
                   onImageGenerated={handleImageGenerated}
                 />
                 
-                {showMinter && generatedImage && (
+                {generatedImage && (
                   <NFTMinter
                     imageUrl={generatedImage}
-                    onClose={() => setShowMinter(false)}
+                    onClose={() => setGeneratedImage(null)}
                     onSuccess={() => {
                       toast.success('NFT minted successfully!');
-                      setShowMinter(false);
+                      setGeneratedImage(null);
                     }}
+                    className="animate-fadeIn"
                   />
                 )}
               </div>
