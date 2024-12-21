@@ -1,4 +1,5 @@
 import '../styles/globals.css';
+import '../styles/wallet-adapter.css';
 import type { AppProps } from 'next/app'
 import { WalletAdapterNetwork } from '@solana/wallet-adapter-base'
 import { PhantomWalletAdapter } from '@solana/wallet-adapter-wallets'
@@ -33,7 +34,9 @@ export default function App({ Component, pageProps }: AppProps) {
       <ConnectionProvider endpoint={endpoint}>
         <WalletProvider wallets={wallets} autoConnect>
           <WalletModalProvider>
-            <Component {...pageProps} />
+            <div className="relative min-h-screen">
+              <Component {...pageProps} />
+            </div>
           </WalletModalProvider>
         </WalletProvider>
       </ConnectionProvider>

@@ -4,50 +4,108 @@ export default function Terms() {
   return (
     <Layout>
       <div className="responsive-container py-12">
-        <h1 className="text-3xl font-bold mb-8">Terms of Service</h1>
+        <h1 className="text-3xl font-bold mb-8 text-white">SOBA Verse Terms of Service</h1>
         <div className="prose prose-invert max-w-none">
           <h2>1. Acceptance of Terms</h2>
           <p>
-            By accessing and using SOBA Verse, you agree to be bound by these Terms of Service 
-            and all applicable laws and regulations.
+            Welcome to SOBA Verse. By accessing and using our platform, you agree to be bound by these Terms of Service 
+            and our Privacy Policy. SOBA Verse is a next-generation platform for creating and minting AI-generated NFT artwork 
+            on the Solana blockchain.
           </p>
 
-          <h2>2. NFT Generation and Ownership</h2>
+          <h2>2. Platform Technology</h2>
           <p>
-            When you generate and mint NFTs through our platform:
+            SOBA Verse utilizes the following technologies:
           </p>
           <ul>
-            <li>You retain ownership of your generated NFTs</li>
-            <li>You are responsible for any transaction fees</li>
-            <li>We maintain a 5% royalty on secondary sales</li>
-            <li>You agree not to generate inappropriate or illegal content</li>
+            <li>Next.js 13 for the web application framework</li>
+            <li>Solana blockchain for NFT minting and transactions</li>
+            <li>Replicate AI for image generation</li>
+            <li>IPFS/NFT.Storage for decentralized storage</li>
+            <li>Prisma with NeonDB for database management</li>
+            <li>Vercel for deployment and hosting</li>
           </ul>
 
-          <h2>3. User Responsibilities</h2>
+          <h2>3. Services</h2>
+          <p>
+            Our platform provides:
+          </p>
           <ul>
-            <li>Maintain the security of your wallet</li>
-            <li>Comply with all applicable laws</li>
-            <li>Not engage in market manipulation</li>
-            <li>Not use the service for illegal activities</li>
+            <li>AI-powered image generation using state-of-the-art models</li>
+            <li>NFT minting on the Solana blockchain</li>
+            <li>Custom SOBA frame overlays and artwork enhancement</li>
+            <li>Wallet integration via Solana Wallet Adapter</li>
+            <li>Community features and exclusive access</li>
           </ul>
 
-          <h2>4. Intellectual Property</h2>
-          <p>
-            The SOBA Verse platform, including its original content and features, 
-            is owned by SOBA Verse and protected by international copyright, trademark, 
-            and other intellectual property laws.
-          </p>
+          <h2>4. User Obligations</h2>
+          <ul>
+            <li>Connect a valid Solana wallet to use our services</li>
+            <li>Maintain the security of your wallet and credentials</li>
+            <li>Respect usage limits and fair platform usage</li>
+            <li>Comply with all applicable laws and regulations</li>
+            <li>Respect intellectual property rights</li>
+          </ul>
 
-          <h2>5. Limitation of Liability</h2>
+          <h2>5. NFT Ownership & Rights</h2>
           <p>
-            SOBA Verse shall not be liable for any indirect, incidental, special, 
-            consequential, or punitive damages resulting from your use of the service.
+            When you mint an NFT through SOBA Verse:
           </p>
+          <ul>
+            <li>You own the NFT on the Solana blockchain</li>
+            <li>Ownership is verified through the Solana network</li>
+            <li>NFTs are part of the official SOBA Verse collection (Collection Address: JBvMgUVSD9oQiwcfQx932CCbheaRpmiSFoLpESwzGeyn)</li>
+            <li>Each NFT includes metadata stored on IPFS</li>
+          </ul>
 
-          <h2>6. Changes to Terms</h2>
+          <h2>6. Intellectual Property</h2>
           <p>
-            We reserve the right to modify these terms at any time. We will notify users 
-            of any material changes via email or platform notification.
+            SOBA Verse retains all rights to:
+          </p>
+          <ul>
+            <li>The SOBA Verse platform and its codebase</li>
+            <li>Our AI image generation technology and prompts</li>
+            <li>SOBA frame designs and overlay elements</li>
+            <li>Brand assets, logos, and visual identity</li>
+            <li>The SOBA Verse collection smart contract</li>
+          </ul>
+
+          <h2>7. Generated Content Rights</h2>
+          <p>
+            For AI-generated images:
+          </p>
+          <ul>
+            <li>You receive a license to use the generated artwork as an NFT</li>
+            <li>The base AI model remains under Replicate's terms</li>
+            <li>SOBA Verse overlays and enhancements remain our property</li>
+            <li>Commercial rights are granted to NFT holders per our License Agreement</li>
+          </ul>
+
+          <h2>8. Technical Limitations</h2>
+          <p>
+            Users acknowledge:
+          </p>
+          <ul>
+            <li>Generation limits of 5 images per wallet per day</li>
+            <li>Solana network fees for minting operations</li>
+            <li>Processing time for AI generation</li>
+            <li>Storage limitations on IPFS</li>
+          </ul>
+
+          <h2>9. Updates and Modifications</h2>
+          <p>
+            SOBA Verse reserves the right to:
+          </p>
+          <ul>
+            <li>Update the platform and its features</li>
+            <li>Modify these terms with notice</li>
+            <li>Adjust generation limits and parameters</li>
+            <li>Enhance AI models and frame designs</li>
+          </ul>
+
+          <h2>10. Contact</h2>
+          <p>
+            For questions about these terms or our services, contact us at legal@sobaverse.com
           </p>
         </div>
       </div>

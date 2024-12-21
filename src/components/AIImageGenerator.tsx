@@ -151,39 +151,82 @@ export default function AIImageGenerator({ onImageGenerated }: AIImageGeneratorP
     }
   };
 
-  const handleSurpriseMe = () => {
-    const randomIndex = Math.floor(Math.random() * PREDEFINED_PROMPTS.length);
-    setPrompt(PREDEFINED_PROMPTS[randomIndex]);
-    // Smooth scroll to the textarea
-    document.querySelector('textarea')?.scrollIntoView({ behavior: 'smooth' });
-  };
-
   return (
     <div className="card space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <h2 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-[#ff6b00] to-[#ff8533]">
-          Generate AI Image
+          Design Your SOBA Chimp
         </h2>
-        <div className="px-4 py-2 rounded-full bg-[#1a1a1a] border border-[#ff6b00]/20">
-          <p className="text-sm flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-[#ff6b00] animate-pulse"></span>
-            Remaining: <span className="text-[#ff6b00] font-bold">{remainingGenerations}/5</span>
+        <div className="px-4 py-2 rounded-full bg-[#1a1a1a] border border-[#ff6b00]/20 w-full sm:w-auto">
+          <p className="text-sm flex items-center justify-center sm:justify-start gap-2">
+            <svg className="w-4 h-4 text-[#ff6b00]" fill="currentColor" viewBox="0 0 20 20">
+              <path d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z" />
+            </svg>
+            <span>{remainingGenerations} generations remaining today</span>
           </p>
         </div>
       </div>
 
-      <div className="relative group">
+      <div className="space-y-4">
         <textarea
-          className="input-primary min-h-[120px] resize-none transition-all duration-300
-                     focus:shadow-lg focus:shadow-[#ff6b00]/10"
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
-          placeholder="Describe your NFT... Be creative!"
-          maxLength={500}
+          placeholder="Describe your SOBA chimpanzee's style, accessories, and attitude..."
+          className="w-full h-32 bg-[#1a1a1a] rounded-lg p-4 resize-none focus:ring-2 focus:ring-[#ff6b00]/50 focus:outline-none transition-all"
         />
-        <div className="absolute bottom-3 right-3 text-gray-400 text-sm
-                        transition-opacity group-focus-within:opacity-100 opacity-70">
-          {prompt.length}/500
+
+        <div className="flex flex-col sm:flex-row gap-4">
+          <button
+            onClick={() => {
+              const randomPrompt = PREDEFINED_PROMPTS[Math.floor(Math.random() * PREDEFINED_PROMPTS.length)];
+              setPrompt(randomPrompt);
+            }}
+            className="btn-secondary group relative overflow-hidden flex-1 sm:flex-none"
+          >
+            <div className="absolute inset-0 bg-gradient-to-r from-[#ff6b00]/20 via-[#ff8533]/20 to-[#ff6b00]/20 group-hover:animate-shimmer" />
+            <div className="absolute -inset-1 bg-gradient-to-r from-[#ff6b00] via-[#ff8533] to-[#ff6b00] rounded-lg blur opacity-30 group-hover:opacity-40 transition-all duration-300" />
+            <span className="relative flex items-center justify-center group-hover:scale-105 transition-transform duration-200">
+              <svg 
+                className="w-5 h-5 mr-2 group-hover:animate-spin-slow" 
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.828 14.828a4 4 0 01-5.656 0M9.172 9.172a4 4 0 015.656 0M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3" />
+              </svg>
+              Surprise Me!
+              <div className="absolute -right-1 -top-1">
+                <span className="flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#ff6b00] opacity-30"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-[#ff6b00]"></span>
+                </span>
+              </div>
+            </span>
+          </button>
+
+          <button
+            onClick={generateImage}
+            disabled={generating || !prompt || !publicKey}
+            className="btn-primary flex-1 relative group overflow-hidden"
+          >
+            <div className="absolute inset-0 bg-gradient-to-r from-[#ff6b00]/20 to-[#ff6b00]/0 group-hover:animate-shimmer" />
+            <span className="relative flex items-center justify-center">
+              {generating ? (
+                <>
+                  <div className="loading-spinner mr-2" />
+                  Generating...
+                </>
+              ) : (
+                <>
+                  <svg className="w-5 h-5 mr-2 group-hover:animate-pulse" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-8.707l-3-3a1 1 0 00-1.414 1.414L10.586 9H7a1 1 0 100 2h3.586l-1.293 1.293a1 1 0 101.414 1.414l3-3a1 1 0 000-1.414z" clipRule="evenodd" />
+                  </svg>
+                  Generate
+                </>
+              )}
+            </span>
+          </button>
         </div>
       </div>
 
@@ -198,51 +241,6 @@ export default function AIImageGenerator({ onImageGenerated }: AIImageGeneratorP
           </p>
         </div>
       )}
-
-      <div className="flex gap-4 mb-4">
-        <button
-          onClick={handleSurpriseMe}
-          className="btn-secondary flex items-center gap-2"
-          disabled={generating}
-        >
-          <svg 
-            className="w-5 h-5" 
-            fill="none" 
-            stroke="currentColor" 
-            viewBox="0 0 24 24"
-          >
-            <path 
-              strokeLinecap="round" 
-              strokeLinejoin="round" 
-              strokeWidth={2} 
-              d="M13 10V3L4 14h7v7l9-11h-7z" 
-            />
-          </svg>
-          Surprise Me
-        </button>
-      </div>
-
-      <button
-        className="btn-primary group relative"
-        onClick={generateImage}
-        disabled={generating || remainingGenerations === 0}
-      >
-        <span className="flex items-center justify-center">
-          {generating ? (
-            <>
-              <div className="loading-spinner mr-2" />
-              Generating...
-            </>
-          ) : (
-            <>
-              <svg className="w-5 h-5 mr-2 group-hover:animate-pulse" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M4 5a2 2 0 00-2 2v8a2 2 0 002 2h12a2 2 0 002-2V7a2 2 0 00-2-2h-1.586a1 1 0 01-.707-.293l-1.121-1.121A2 2 0 0011.172 3H8.828a2 2 0 00-1.414.586L6.293 4.707A1 1 0 015.586 5H4zm6 9a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" />
-              </svg>
-              Generate Image
-            </>
-          )}
-        </span>
-      </button>
 
       {(downloadUrl || originalUrl) && (
         <div className="space-y-4">

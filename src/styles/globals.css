@@ -139,7 +139,7 @@ body {
 /* NFT preview styles */
 .nft-preview {
   @apply relative aspect-square w-full overflow-hidden rounded-lg
-         bg-[#1a1a1a] cursor-pointer group
+         bg-[#1a1a1a] cursor-pointer
          transition-transform duration-300 hover:scale-[1.02];
 }
 
@@ -327,5 +327,13 @@ body {
 
 .modal-enter {
   animation: modalIn 0.3s ease-out forwards;
+}
+
+.animation-delay-2000 {
+  animation-delay: 2s;
+}
+
+.animation-delay-4000 {
+  animation-delay: 4s;
 }
   

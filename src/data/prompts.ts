@@ -1,4 +1,8 @@
 export const PREDEFINED_PROMPTS = [
+    "A Sol Bastard chimpanzee in a luxury penthouse, wearing a SOBA branded suit and diamond-encrusted chain, counting stacks of $SOBA tokens",
+    "A powerful Sol Bastard chimp trading $SOBA tokens on multiple holographic screens in a futuristic trading room",
+    "A Sol Bastard ape hosting a VIP crypto party, with $SOBA tokens raining from the ceiling",
+    "A legendary Sol Bastard chimp standing on top of a mountain of $SOBA coins, wearing a crown and holding a golden scepter",
     "A muscular, rich chimpanzee standing confidently in a lavish penthouse, wearing sunglasses and a tailored suit, holding a lit cigar, with gold jewelry gleaming.",
     "A strong chimpanzee with a chiseled physique lounging on a luxury yacht, wearing bold sunglasses, surrounded by stacks of cash and fine champagne.",
     "A rich chimpanzee posing in front of a flashy sports car, showing off his abs, wearing a vibrant Hawaiian shirt, and a confident smirk.",

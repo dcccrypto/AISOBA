@@ -149,6 +149,7 @@ export default function GeneratedImagesGallery() {
                 {!selectedImage.isMinted && (
                   <NFTMinter
                     imageUrl={selectedImage.imageUrl}
+                    onClose={() => setSelectedImage(null)}
                     onSuccess={() => {
                       toast.success('NFT minted successfully!');
                       setSelectedImage(null);

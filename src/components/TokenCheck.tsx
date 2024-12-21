@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useWallet, useConnection } from '@solana/wallet-adapter-react';
 import { PublicKey, Commitment } from '@solana/web3.js';
 import { TOKEN_PROGRAM_ID, getAccount, getAssociatedTokenAddress } from '@solana/spl-token';
+import { WalletMultiButtonDynamic } from '@solana/wallet-adapter-react';
 
 interface TokenCheckProps {
   requiredAmount: number;
@@ -88,66 +89,75 @@ export default function TokenCheck({ requiredAmount, onVerification }: TokenChec
   }, [publicKey]);
 
   return (
-    <div className="card transform hover:scale-[1.01] transition-transform duration-300">
-      <h2 className="text-2xl font-bold mb-6 text-transparent bg-clip-text bg-gradient-to-r from-[#ff6b00] to-[#ff8533]">
-        Token Verification
-      </h2>
-      
-      {publicKey ? (
-        <>
-          {loading ? (
-            <div className="flex items-center space-x-3 text-gray-400">
-              <div className="loading-spinner" />
-              <p>Checking token balance...</p>
+    <div className="card p-8 bg-[#2a2a2a] border border-[#ff6b00]/10 rounded-lg overflow-hidden relative z-10">
+      <div className="relative">
+        {!publicKey && (
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-8">
+            <div className="flex-1 space-y-4 text-center md:text-left">
+              <h2 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-[#ff6b00] to-[#ff8533]">
+                Create Your SOBA Chimp
+              </h2>
+              <p className="text-gray-400">
+                Connect your wallet to start generating your unique SOBA chimpanzee PFP
+              </p>
             </div>
-          ) : (
-            <>
-              {tokenBalance !== null && (
-                <div className="mb-4 p-4 rounded-lg bg-[#1a1a1a]/50">
-                  <p className="text-lg">
-                    Current Balance: 
-                    <span className="font-bold ml-2 text-[#ff6b00]">
-                      {tokenBalance}
-                    </span> 
-                    <span className="text-gray-400 ml-1">tokens</span>
-                  </p>
-                </div>
-              )}
-              {error ? (
-                <div className="p-4 rounded-lg bg-red-500/10 border border-red-500/20">
-                  <p className="text-red-500">{error}</p>
-                </div>
-              ) : (
-                tokenBalance !== null && tokenBalance >= requiredAmount && (
-                  <div className="p-4 rounded-lg bg-green-500/10 border border-green-500/20">
-                    <p className="text-[#ff6b00] flex items-center">
-                      <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                      </svg>
-                      Sufficient token balance
-                    </p>
-                  </div>
-                )
-              )}
-              <button
-                onClick={checkTokenBalance}
-                className="btn-secondary mt-4 w-full sm:w-auto"
+            <div className="flex justify-center md:justify-end">
+              <WalletMultiButtonDynamic className="!bg-[#ff6b00] hover:!bg-[#ff8533] transition-colors !h-auto !py-3 !px-6" />
+            </div>
+          </div>
+        )}
+
+        {publicKey && tokenBalance !== null && tokenBalance < requiredAmount && (
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-8">
+            <div className="flex-1 space-y-4 text-center md:text-left">
+              <h2 className="text-2xl font-bold text-white">Get More $SOBA</h2>
+              <p className="text-gray-400">
+                You need at least {requiredAmount} $SOBA tokens to create your custom SOBA chimp PFP
+              </p>
+              <div className="flex items-center gap-2 justify-center md:justify-start text-sm text-gray-400">
+                <span>Current Balance:</span>
+                <span className="text-[#ff6b00] font-medium">{tokenBalance} $SOBA</span>
+              </div>
+            </div>
+            <div className="flex justify-center md:justify-end">
+              <a
+                href="https://jup.ag/swap/SOL-soba"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn-primary px-8 py-3"
               >
-                <span className="flex items-center justify-center">
-                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                  </svg>
-                  Refresh Balance
-                </span>
-              </button>
-            </>
-          )}
-        </>
-      ) : (
-        <div className="p-4 rounded-lg bg-[#1a1a1a]/50 text-center">
-          <p className="text-gray-400">Please connect your wallet to check token balance</p>
-        </div>
-      )}
+                Get $SOBA Tokens
+              </a>
+            </div>
+          </div>
+        )}
+
+        {publicKey && tokenBalance !== null && tokenBalance >= requiredAmount && (
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-8">
+            <div className="flex-1 space-y-4 text-center md:text-left">
+              <h2 className="text-2xl font-bold text-[#ff6b00]">Ready to Create!</h2>
+              <p className="text-gray-400">
+                You have enough $SOBA tokens. Start creating your SOBA chimp PFP below.
+              </p>
+              <div className="flex items-center gap-2 justify-center md:justify-start text-sm text-gray-400">
+                <span>Current Balance:</span>
+                <span className="text-[#ff6b00] font-medium">{tokenBalance} $SOBA</span>
+              </div>
+            </div>
+            <div className="flex justify-center md:justify-end">
+              <div className="bg-[#ff6b00]/10 rounded-lg px-4 py-2">
+                <span className="text-[#ff6b00] font-medium">✓ Verified</span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {error && (
+          <div className="mt-4 text-center md:text-left text-red-500">
+            {error}
+          </div>
+        )}
+      </div>
     </div>
   );
 } 

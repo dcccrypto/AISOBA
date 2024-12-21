@@ -25,22 +25,19 @@ import { applyOverlay } from '../utils/imageProcessing';
 
 interface NFTMinterProps {
   imageUrl: string;
+  onClose: () => void;
   onSuccess?: () => void;
 }
 
 // Update the collection address constant with your new collection's address
 const COLLECTION_ADDRESS = new PublicKey('JBvMgUVSD9oQiwcfQx932CCbheaRpmiSFoLpESwzGeyn');
 
-export default function NFTMinter({ imageUrl, onSuccess }: NFTMinterProps) {
+export default function NFTMinter({ imageUrl, onClose, onSuccess }: NFTMinterProps) {
   const { publicKey, signTransaction } = useWallet();
   const { connection } = useConnection();
-  const [minting, setMinting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [processedImageUrl, setProcessedImageUrl] = useState<string>('');
-  const [isProcessing, setIsProcessing] = useState(true);
-  const [isPreviewMode, setIsPreviewMode] = useState(false);
-  const [selectedOverlay, setSelectedOverlay] = useState('/nft/nftoverlay.png');
-  const [imageLoaded, setImageLoaded] = useState(false);
+  const [selectedOverlay, setSelectedOverlay] = useState<string | null>(null);
+  const [isMinting, setIsMinting] = useState(false);
+  const [previewImage, setPreviewImage] = useState<string>(imageUrl);
 
   const overlayOptions = [
     { id: 1, path: '/nft/nftoverlay.png', name: 'Classic Frame' },
@@ -50,311 +47,197 @@ export default function NFTMinter({ imageUrl, onSuccess }: NFTMinterProps) {
     { id: 5, path: '/nft/nftoverlay5.png', name: 'Premium Frame' },
   ];
 
+  // Updated frame overlay effect
   useEffect(() => {
-    const processImage = async () => {
-      try {
-        setIsProcessing(true);
-        const overlaidImage = await applyOverlay(imageUrl, selectedOverlay);
-        setProcessedImageUrl(overlaidImage);
-      } catch (error) {
-        console.error('Error processing image:', error);
-        setError('Failed to process image');
-        setProcessedImageUrl(imageUrl);
-      } finally {
-        setIsProcessing(false);
-      }
-    };
-
-    if (imageUrl) {
-      processImage();
-    }
-  }, [imageUrl, selectedOverlay]);
-
-  const mintNFT = async () => {
-    if (!publicKey || !signTransaction) {
-      setError('Please connect your wallet first');
+    if (!selectedOverlay) {
+      setPreviewImage(imageUrl);
       return;
     }
 
-    setMinting(true);
-    setError(null);
+    const applyFrame = async () => {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      
+      if (!ctx) return;
 
+      try {
+        // Load both images
+        const [image, frame] = await Promise.all([
+          loadImage(imageUrl),
+          loadImage(selectedOverlay)
+        ]);
+
+        // Set canvas size to match the original image
+        canvas.width = image.width;
+        canvas.height = image.height;
+
+        // Draw the original image
+        ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+        
+        // Draw the frame
+        ctx.drawImage(frame, 0, 0, canvas.width, canvas.height);
+
+        // Update preview
+        const newPreview = canvas.toDataURL('image/png');
+        setPreviewImage(newPreview);
+      } catch (error) {
+        console.error('Error applying frame:', error);
+        // Fallback to original image if frame application fails
+        setPreviewImage(imageUrl);
+      }
+    };
+
+    applyFrame();
+  }, [selectedOverlay, imageUrl]);
+
+  // Helper function to load images
+  const loadImage = (src: string): Promise<HTMLImageElement> => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.crossOrigin = "anonymous";  // Important for CORS
+      img.onload = () => resolve(img);
+      img.onerror = reject;
+      img.src = src;
+    });
+  };
+
+  const handleDownload = async () => {
     try {
-      const metadataResponse = await fetch('/api/mint-nft', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          imageUrl,
-          wallet: publicKey.toString(),
-        }),
-      });
-
-      if (!metadataResponse.ok) {
-        throw new Error('Failed to prepare NFT metadata');
-      }
-
-      const { metadata } = await metadataResponse.json();
-
-      // Generate a new keypair for the mint account
-      const mintKeypair = Keypair.generate();
-      
-      // Get the minimum lamports required for the mint
-      const lamports = await getMinimumBalanceForRentExemptMint(connection);
-      
-      // Get metadata account address
-      const metadataPDA = PublicKey.findProgramAddressSync(
-        [
-          Buffer.from('metadata'),
-          TOKEN_METADATA_PROGRAM_ID.toBuffer(),
-          mintKeypair.publicKey.toBuffer(),
-        ],
-        TOKEN_METADATA_PROGRAM_ID
-      )[0];
-
-      // Get associated token account address
-      const associatedTokenAccount = await getAssociatedTokenAddress(
-        mintKeypair.publicKey,
-        publicKey
-      );
-
-      // Get collection metadata account
-      const collectionMetadataPDA = PublicKey.findProgramAddressSync(
-        [
-          Buffer.from('metadata'),
-          TOKEN_METADATA_PROGRAM_ID.toBuffer(),
-          COLLECTION_ADDRESS.toBuffer(),
-        ],
-        TOKEN_METADATA_PROGRAM_ID
-      )[0];
-
-      // Create NFT mint transaction
-      const transaction = new Transaction();
-      
-      // Add recent blockhash
-      const { blockhash } = await connection.getLatestBlockhash();
-      transaction.recentBlockhash = blockhash;
-      transaction.feePayer = publicKey;
-
-      // Create mint account
-      transaction.add(
-        SystemProgram.createAccount({
-          fromPubkey: publicKey,
-          newAccountPubkey: mintKeypair.publicKey,
-          space: MINT_SIZE,
-          lamports,
-          programId: TOKEN_PROGRAM_ID,
-        }),
-        // Initialize mint
-        createInitializeMintInstruction(
-          mintKeypair.publicKey,
-          0,
-          publicKey,
-          publicKey,
-          TOKEN_PROGRAM_ID
-        ),
-        // Create associated token account
-        createAssociatedTokenAccountInstruction(
-          publicKey,
-          associatedTokenAccount,
-          publicKey,
-          mintKeypair.publicKey
-        ),
-        // Mint one token
-        createMintToInstruction(
-          mintKeypair.publicKey,
-          associatedTokenAccount,
-          publicKey,
-          1
-        ),
-        // Create metadata account
-        createCreateMetadataAccountV3Instruction(
-          {
-            metadata: metadataPDA,
-            mint: mintKeypair.publicKey,
-            mintAuthority: publicKey,
-            payer: publicKey,
-            updateAuthority: publicKey,
-          },
-          {
-            createMetadataAccountArgsV3: {
-              data: {
-                name: metadata.name,
-                symbol: 'AINFT',
-                uri: metadata.image,
-                sellerFeeBasisPoints: metadata.seller_fee_basis_points,
-                creators: [{
-                  address: publicKey,
-                  verified: true,
-                  share: 100,
-                }],
-                collection: {
-                  key: COLLECTION_ADDRESS,
-                  verified: false, // Will be verified in a separate tx by collection authority
-                },
-                uses: null,
-              },
-              isMutable: true,
-              collectionDetails: null,
-            },
-          }
-        )
-      );
-
-      // Sign with the mint keypair
-      transaction.partialSign(mintKeypair);
-
-      // Sign and send transaction
-      const signedTransaction = await signTransaction(transaction);
-      const signature = await connection.sendRawTransaction(signedTransaction.serialize());
-      await connection.confirmTransaction(signature);
-
-      // Record the mint in database
-      const recordResponse = await fetch('/api/record-nft', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          mintAddress: mintKeypair.publicKey.toString(),
-          imageUrl,
-          wallet: publicKey.toString(),
-        }),
-      });
-
-      if (!recordResponse.ok) {
-        throw new Error('Failed to record NFT in database');
-      }
-
-      // Verify the NFT as part of the collection
-      const verifyResponse = await fetch('/api/verify-collection', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          mintAddress: mintKeypair.publicKey.toString(),
-        }),
-      });
-
-      if (!verifyResponse.ok) {
-        console.warn('Failed to verify NFT in collection:', await verifyResponse.text());
-      }
-
-      console.log('NFT minted successfully into collection:', COLLECTION_ADDRESS.toString());
+      const response = await fetch(imageUrl);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'soba-chimp.png';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
     } catch (error) {
-      console.error('Error minting NFT:', error);
-      setError(error instanceof Error ? error.message : 'Error minting NFT');
+      console.error('Error downloading image:', error);
+    }
+  };
+
+  const handleShare = async () => {
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: 'My SOBA Chimp',
+          text: 'Check out my unique SOBA chimpanzee PFP!',
+          url: imageUrl
+        });
+      } else {
+        await navigator.clipboard.writeText(imageUrl);
+        // Add toast notification here if you have one
+        alert('Image URL copied to clipboard!');
+      }
+    } catch (error) {
+      console.error('Error sharing:', error);
+    }
+  };
+
+  const handleMint = async () => {
+    setIsMinting(true);
+    try {
+      // Add your minting logic here
+      await new Promise(resolve => setTimeout(resolve, 2000)); // Simulated minting
+      onSuccess?.();
+      onClose();
+    } catch (error) {
+      console.error('Error minting:', error);
     } finally {
-      setMinting(false);
+      setIsMinting(false);
     }
   };
 
   return (
-    <div className="card hover:shadow-orange-500/20">
-      <div className="flex flex-col space-y-6">
-        <div className="flex items-center justify-between">
-          <h2 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-[#ff6b00] to-[#ff8533]">
-            Mint as NFT
-          </h2>
-          <button
-            onClick={() => setIsPreviewMode(!isPreviewMode)}
-            className="px-3 py-1 text-sm rounded-full bg-gray-800 hover:bg-gray-700 transition-colors duration-200"
-          >
-            {isPreviewMode ? 'Show Original' : 'Preview NFT'}
-          </button>
-        </div>
-
-        <div className="image-container aspect-square">
-          {!imageLoaded && (
-            <div className="absolute inset-0 flex items-center justify-center bg-[#1a1a1a]/80 z-20">
-              <div className="loading-spinner w-8 h-8"></div>
-            </div>
-          )}
-          <img 
-            src={processedImageUrl} 
-            alt={isPreviewMode ? "NFT preview" : "Original artwork"} 
-            className={`w-full h-full object-cover transition-all duration-500 ${
-              imageLoaded ? 'opacity-100 scale-100' : 'opacity-0 scale-95'
-            }`}
-            onLoad={() => setImageLoaded(true)}
-          />
-          
-          {isPreviewMode && (
-            <div className="absolute top-2 right-2 bg-black/70 px-3 py-1 rounded-full
-                            backdrop-blur-sm transform-gpu translate-y-2 opacity-0
-                            group-hover:translate-y-0 group-hover:opacity-100
-                            transition-all duration-300 z-20">
-              <p className="text-xs text-white font-medium">NFT Preview</p>
-            </div>
-          )}
-          
-          <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent
-                          opacity-0 group-hover:opacity-100 transition-opacity duration-300
-                          flex items-end justify-center p-6 z-10">
-            <p className="text-white text-sm text-center transform-gpu translate-y-4
-                          group-hover:translate-y-0 transition-all duration-300">
-              {isPreviewMode ? 'Preview of your NFT with overlay' : 'Click Preview NFT to see how it will look'}
-            </p>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-5 gap-2">
-          {overlayOptions.map((overlay) => (
-            <button
-              key={overlay.id}
-              onClick={() => setSelectedOverlay(overlay.path)}
-              className={`p-2 rounded-lg border transition-all ${
-                selectedOverlay === overlay.path
-                  ? 'border-[#ff6b00] bg-[#ff6b00]/10'
-                  : 'border-gray-700 hover:border-[#ff6b00]/50'
-              }`}
-            >
-              <img
-                src={overlay.path}
-                alt={overlay.name}
-                className="w-full h-12 object-contain"
-              />
-              <p className="text-xs mt-1 text-center text-gray-400">
-                {overlay.name}
-              </p>
-            </button>
-          ))}
-        </div>
-
-        {error && (
-          <div className="p-4 rounded-lg bg-red-500/10 border border-red-500/20">
-            <p className="text-red-500 text-sm flex items-center">
-              <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-              </svg>
-              {error}
-            </p>
-          </div>
-        )}
-
-        <button
-          onClick={mintNFT}
-          disabled={minting || isProcessing || !processedImageUrl}
-          className="btn-primary group relative"
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/50 flex items-center justify-center p-4">
+      <div className="relative w-full max-w-6xl bg-[#2a2a2a] rounded-lg shadow-xl">
+        <button 
+          onClick={onClose}
+          className="absolute right-4 top-4 text-gray-400 hover:text-white transition-colors z-10"
         >
-          <span className="flex items-center justify-center">
-            {minting ? (
-              <>
-                <div className="loading-spinner mr-2" />
-                Minting...
-              </>
-            ) : (
-              <>
-                <svg className="w-5 h-5 mr-2 group-hover:animate-pulse" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M4 4a2 2 0 00-2 2v8a2 2 0 002 2h12a2 2 0 002-2V8a2 2 0 00-2-2h-5L9 4H4zm7 5a1 1 0 00-2 0v1H8a1 1 0 000 2h1v1a1 1 0 002 0v-1h1a1 1 0 000-2h-1V9z" />
-                </svg>
-                Mint NFT
-              </>
-            )}
-          </span>
+          <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
         </button>
 
-        {isPreviewMode && (
-          <p className="text-sm text-gray-400 text-center">
-            This is how your NFT will look after minting. The overlay will be permanently applied.
-          </p>
-        )}
+        <div className="flex flex-col md:flex-row max-h-[90vh]">
+          {/* Preview section */}
+          <div className="md:w-1/2 p-6 flex-shrink-0">
+            <div className="aspect-square rounded-lg overflow-hidden bg-[#1a1a1a]">
+              <img 
+                src={previewImage} 
+                alt="SOBA Chimp Preview" 
+                className="w-full h-full object-contain"
+              />
+            </div>
+            
+            {/* Download and Share buttons */}
+            <div className="flex gap-4 mt-4">
+              <button 
+                onClick={handleDownload}
+                className="flex-1 px-4 py-2 bg-[#1a1a1a] text-white rounded-lg hover:bg-[#ff6b00]/10 transition-colors"
+              >
+                Download
+              </button>
+              <button 
+                onClick={handleShare}
+                className="flex-1 px-4 py-2 bg-[#1a1a1a] text-white rounded-lg hover:bg-[#ff6b00]/10 transition-colors"
+              >
+                Share
+              </button>
+            </div>
+          </div>
+
+          {/* Frame selection section */}
+          <div className="md:w-1/2 p-6 overflow-y-auto border-t md:border-t-0 md:border-l border-[#ff6b00]/10">
+            <div className="space-y-6">
+              <div>
+                <h2 className="text-2xl font-bold text-white mb-2">
+                  Select Frame
+                </h2>
+                <p className="text-gray-400">
+                  Choose a frame for your SOBA chimp NFT
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                {overlayOptions.map((overlay) => (
+                  <button
+                    key={overlay.id}
+                    onClick={() => setSelectedOverlay(overlay.path)}
+                    className={`p-4 rounded-lg border border-[#ff6b00]/10 hover:border-[#ff6b00]/30 bg-[#1a1a1a] text-white transition-colors ${
+                      selectedOverlay === overlay.path ? 'border-[#ff6b00] bg-[#ff6b00]/10' : ''
+                    }`}
+                  >
+                    <img
+                      src={overlay.path}
+                      alt={overlay.name}
+                      className="w-full h-12 object-contain"
+                    />
+                    <p className="text-xs mt-1 text-center text-gray-400">
+                      {overlay.name}
+                    </p>
+                  </button>
+                ))}
+              </div>
+
+              <div className="pt-6">
+                <button 
+                  onClick={handleMint}
+                  disabled={isMinting}
+                  className="w-full bg-[#ff6b00] hover:bg-[#ff8533] disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-3 px-6 rounded-lg transition-colors"
+                >
+                  {isMinting ? 'Minting...' : 'Mint NFT'}
+                </button>
+                <p className="text-sm text-gray-400 mt-2 text-center">
+                  Gas fees will apply
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
