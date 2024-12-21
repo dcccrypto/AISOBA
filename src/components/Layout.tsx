@@ -1,7 +1,6 @@
 import Navbar from './Navbar';
 import Footer from './Footer';
 import CookieConsent from './CookieConsent';
-import SobaTickerBadge from './SobaTickerBadge';
 import RewardsNotification from './RewardsNotification';
 
 export default function Layout({ children }: { children: React.ReactNode }) {
@@ -29,7 +28,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       <main className="flex-grow">{children}</main>
       <Footer />
       <CookieConsent />
-      <SobaTickerBadge />
       <RewardsNotification />
     </div>
   );
