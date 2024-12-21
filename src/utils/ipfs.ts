@@ -1,15 +1,15 @@
 import { NFTStorage } from 'nft.storage';
 
-// Add proper token validation
-const NFT_STORAGE_TOKEN = process.env.NFT_STORAGE_TOKEN;
-if (!NFT_STORAGE_TOKEN || NFT_STORAGE_TOKEN.includes('...')) {
-  throw new Error('Valid NFT_STORAGE_TOKEN is required');
+// Initialize client with direct token (no JWT validation needed)
+const NFT_STORAGE_TOKEN = process.env.NFT_STORAGE_TOKEN?.trim();
+
+if (!NFT_STORAGE_TOKEN) {
+  throw new Error('NFT_STORAGE_TOKEN is not configured');
 }
 
-// Initialize client with proper configuration
 const client = new NFTStorage({ 
-  token: NFT_STORAGE_TOKEN.trim(),
-  endpoint: new URL('https://api.nft.storage')
+  token: NFT_STORAGE_TOKEN,
+  endpoint: new URL('https://api.nft.storage') // Use base URL
 });
 
 /**
@@ -17,13 +17,8 @@ const client = new NFTStorage({
  */
 export async function uploadToIPFS(imageUrl: string): Promise<string> {
   try {
-    // Fetch the image with proper headers
-    const response = await fetch(imageUrl, {
-      headers: {
-        'Accept': 'image/*'
-      }
-    });
-    
+    // Fetch the image
+    const response = await fetch(imageUrl);
     if (!response.ok) {
       throw new Error(`Failed to fetch image: ${response.statusText}`);
     }
@@ -33,8 +28,13 @@ export async function uploadToIPFS(imageUrl: string): Promise<string> {
       throw new Error('Empty image blob');
     }
 
-    // Upload with proper error handling
-    const cid = await client.storeBlob(new Blob([imageBlob], { type: imageBlob.type }));
+    // Create file with proper MIME type
+    const file = new File([imageBlob], 'image.png', { 
+      type: imageBlob.type || 'image/png'
+    });
+
+    // Store the file
+    const cid = await client.storeBlob(file);
     if (!cid) {
       throw new Error('Failed to get CID from NFT.Storage');
     }
@@ -44,8 +44,7 @@ export async function uploadToIPFS(imageUrl: string): Promise<string> {
     console.error('Detailed IPFS Upload Error:', {
       error,
       message: error instanceof Error ? error.message : 'Unknown error',
-      stack: error instanceof Error ? error.stack : undefined,
-      token: NFT_STORAGE_TOKEN ? 'Token exists' : 'No token found'
+      stack: error instanceof Error ? error.stack : undefined
     });
     throw new Error('Failed to store image on IPFS');
   }
