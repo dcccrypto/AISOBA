@@ -1,5 +1,5 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { startOfDay, endOfDay } from 'date-fns';
+import { startOfDay, endOfDay } from 'date-fns/fp';
 import prisma from '../../lib/prisma';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -45,13 +45,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     }
 
+    const now = new Date();
+    
     // Check today's generations
     const todayGenerations = await prisma.imageGeneration.count({
       where: {
         userId: user.id,
         createdAt: {
-          gte: startOfDay(new Date()),
-          lte: endOfDay(new Date()),
+          gte: new Date(now.setHours(0, 0, 0, 0)), // Start of day
+          lte: new Date(now.setHours(23, 59, 59, 999)), // End of day
         },
       },
     });
@@ -69,6 +71,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
   } catch (error) {
     console.error('Database Error:', error);
+    if (error instanceof Error) {
+      console.error('Error stack:', error.stack);
+    }
     return res.status(500).json({ 
       success: false,
       message: 'Database connection error',
