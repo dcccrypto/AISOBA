@@ -6,9 +6,12 @@ import { ConnectionProvider, WalletProvider } from '@solana/wallet-adapter-react
 import { WalletModalProvider } from '@solana/wallet-adapter-react-ui'
 import { clusterApiUrl } from '@solana/web3.js'
 import { useMemo } from 'react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 // Import wallet adapter CSS
 require('@solana/wallet-adapter-react-ui/styles.css')
+
+const queryClient = new QueryClient();
 
 export default function App({ Component, pageProps }: AppProps) {
   // Changed to correct enum value
@@ -26,12 +29,14 @@ export default function App({ Component, pageProps }: AppProps) {
   )
 
   return (
-    <ConnectionProvider endpoint={endpoint}>
-      <WalletProvider wallets={wallets} autoConnect>
-        <WalletModalProvider>
-          <Component {...pageProps} />
-        </WalletModalProvider>
-      </WalletProvider>
-    </ConnectionProvider>
+    <QueryClientProvider client={queryClient}>
+      <ConnectionProvider endpoint={endpoint}>
+        <WalletProvider wallets={wallets} autoConnect>
+          <WalletModalProvider>
+            <Component {...pageProps} />
+          </WalletModalProvider>
+        </WalletProvider>
+      </ConnectionProvider>
+    </QueryClientProvider>
   )
 } 

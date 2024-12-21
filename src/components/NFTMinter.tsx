@@ -25,12 +25,13 @@ import { applyOverlay } from '../utils/imageProcessing';
 
 interface NFTMinterProps {
   imageUrl: string;
+  onSuccess?: () => void;
 }
 
 // Update the collection address constant with your new collection's address
 const COLLECTION_ADDRESS = new PublicKey('JBvMgUVSD9oQiwcfQx932CCbheaRpmiSFoLpESwzGeyn');
 
-export default function NFTMinter({ imageUrl }: NFTMinterProps) {
+export default function NFTMinter({ imageUrl, onSuccess }: NFTMinterProps) {
   const { publicKey, signTransaction } = useWallet();
   const { connection } = useConnection();
   const [minting, setMinting] = useState(false);
