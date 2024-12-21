@@ -2,8 +2,13 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import { PrismaClient } from '@prisma/client';
 import { startOfDay, endOfDay } from 'date-fns';
 
-// Initialize PrismaClient
-const prisma = new PrismaClient();
+// PrismaClient is attached to the `global` object in development to prevent
+// exhausting your database connection limit.
+const globalForPrisma = global as unknown as { prisma: PrismaClient };
+
+const prisma = globalForPrisma.prisma || new PrismaClient();
+
+if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   // Handle preflight request
@@ -77,11 +82,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       message: 'Database connection error',
       error: error instanceof Error ? error.message : 'Unknown error'
     });
-  } finally {
-    try {
-      await prisma.$disconnect();
-    } catch (e) {
-      console.error('Error disconnecting from database:', e);
-    }
   }
 } 
