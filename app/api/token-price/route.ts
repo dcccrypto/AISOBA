@@ -1,24 +1,15 @@
 import { NextResponse } from 'next/server';
-import { headers } from 'next/headers';
 
 export async function GET() {
-  // Create headers for CORS
-  const responseHeaders = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type'
-  };
-
   try {
-    // Use Birdeye API with correct endpoint
+    // Use Birdeye API with correct endpoint and headers
     const birdeyeResponse = await fetch('https://public-api.birdeye.so/defi/v3/token/market-data?address=25p2BoNp6qrJH5As6ek6H7Ei495oSkyZd3tGb97sqFmH', {
       method: 'GET',
       headers: {
         'X-API-KEY': process.env.NEXT_PUBLIC_BIRDEYE_API_KEY || '',
-        'accept': 'application/json',
+        'Accept': 'application/json',
         'x-chain': 'solana'
-      },
-      next: { revalidate: 30 } // Revalidate every 30 seconds
+      }
     });
 
     if (birdeyeResponse.ok) {
@@ -27,7 +18,7 @@ export async function GET() {
         return NextResponse.json({
           price: data.data?.price || 0,
           change24h: data.data?.priceChange24h || 0
-        }, { headers: responseHeaders });
+        });
       }
     }
 
@@ -39,14 +30,14 @@ export async function GET() {
     return NextResponse.json({
       price: raydiumData['25p2BoNp6qrJH5As6ek6H7Ei495oSkyZd3tGb97sqFmH'] || 0,
       change24h: 0
-    }, { headers: responseHeaders });
+    });
 
   } catch (error) {
     console.error('Error fetching price:', error);
     return NextResponse.json({
       price: 0,
       change24h: 0
-    }, { headers: responseHeaders });
+    });
   }
 }
 
