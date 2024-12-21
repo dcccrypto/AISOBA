@@ -2,8 +2,15 @@ import { useState, useEffect } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { saveAs } from 'file-saver';
 
+interface GenerateImageResponse {
+  success: boolean;
+  imageUrl: string;
+  originalUrl: string;
+  message?: string;
+}
+
 interface AIImageGeneratorProps {
-  onImageGenerated: (imageUrl: string) => void;
+  onImageGenerated: (url: string) => void;
 }
 
 export default function AIImageGenerator({ onImageGenerated }: AIImageGeneratorProps) {
@@ -13,7 +20,9 @@ export default function AIImageGenerator({ onImageGenerated }: AIImageGeneratorP
   const [remainingGenerations, setRemainingGenerations] = useState(5);
   const [error, setError] = useState<string | null>(null);
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
+  const [originalUrl, setOriginalUrl] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
+  const [imageLoaded, setImageLoaded] = useState(false);
   const MAX_RETRIES = 2;
 
   const checkGenerationLimit = async () => {
@@ -56,14 +65,25 @@ export default function AIImageGenerator({ onImageGenerated }: AIImageGeneratorP
     }
   }, [publicKey]);
 
-  const handleDownload = async (url: string) => {
+  const handleDownload = async () => {
     try {
-      const response = await fetch(url);
+      // Try Vercel Blob URL first
+      const urlToDownload = downloadUrl || originalUrl;
+      if (!urlToDownload) {
+        throw new Error('No image URL available');
+      }
+
+      const response = await fetch(urlToDownload);
+      if (!response.ok) {
+        throw new Error('Failed to fetch image');
+      }
+
       const blob = await response.blob();
-      saveAs(blob, 'ai-generated-image.webp');
+      const timestamp = new Date().getTime();
+      saveAs(blob, `soba-${timestamp}.png`);
     } catch (error) {
       console.error('Error downloading image:', error);
-      setError('Failed to download image');
+      setError('Failed to download image. Please try again.');
     }
   };
 
@@ -86,6 +106,9 @@ export default function AIImageGenerator({ onImageGenerated }: AIImageGeneratorP
 
     setGenerating(true);
     setError(null);
+    setDownloadUrl(null);
+    setOriginalUrl(null);
+    setImageLoaded(false);
 
     try {
       const response = await fetch('/api/generate-image', {
@@ -94,37 +117,34 @@ export default function AIImageGenerator({ onImageGenerated }: AIImageGeneratorP
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          prompt,
+          prompt: prompt.trim(),
           wallet: publicKey.toString(),
         }),
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        
-        if (response.status === 504 && retryCount < MAX_RETRIES) {
-          setRetryCount(prev => prev + 1);
-          console.log(`Retrying... Attempt ${retryCount + 1} of ${MAX_RETRIES}`);
-          await generateImage();
-          return;
-        }
+      const data = await response.json() as GenerateImageResponse;
 
-        throw new Error(errorData.message || 'Failed to generate image');
-      }
-
-      const data = await response.json();
-      
-      if (!data.success) {
+      if (!data.success || !data.imageUrl) {
         throw new Error(data.message || 'Failed to generate image');
       }
 
-      setDownloadUrl(data.imageUrl);
+      // Store both URLs, with null checks
+      setDownloadUrl(data.imageUrl || null);
+      setOriginalUrl(data.originalUrl || data.imageUrl || null);
       onImageGenerated(data.imageUrl);
       setRetryCount(0);
+      
+      // Refresh remaining generations
+      await checkGenerationLimit();
 
     } catch (error) {
       console.error('Error generating image:', error);
       setError(error instanceof Error ? error.message : 'Failed to generate image');
+      
+      if (retryCount < MAX_RETRIES) {
+        setRetryCount(prev => prev + 1);
+        await generateImage();
+      }
     } finally {
       setGenerating(false);
     }
@@ -189,17 +209,60 @@ export default function AIImageGenerator({ onImageGenerated }: AIImageGeneratorP
           </span>
         </button>
 
-        {downloadUrl && (
-          <div className="mt-4 flex justify-end">
-            <button
-              onClick={() => handleDownload(downloadUrl)}
-              className="btn-secondary flex items-center space-x-2 text-sm"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-              </svg>
-              <span>Download Image</span>
-            </button>
+        {(downloadUrl || originalUrl) && (
+          <div className="space-y-4">
+            <div className="relative">
+              {!imageLoaded && (
+                <div className="absolute inset-0 flex items-center justify-center bg-gray-900/50 rounded-lg">
+                  <div className="loading-spinner" />
+                </div>
+              )}
+              <img 
+                src={downloadUrl || originalUrl || ''} 
+                alt="Generated artwork" 
+                className={`w-full rounded-lg shadow-lg transition-opacity duration-300 ${
+                  imageLoaded ? 'opacity-100' : 'opacity-0'
+                }`}
+                onLoad={() => setImageLoaded(true)}
+                onError={(e) => {
+                  // If Vercel Blob URL fails, try the original URL
+                  if (originalUrl && e.currentTarget.src !== originalUrl) {
+                    e.currentTarget.src = originalUrl;
+                  } else {
+                    setError('Failed to load image');
+                  }
+                }}
+              />
+            </div>
+            
+            <div className="flex gap-2">
+              <button
+                onClick={handleDownload}
+                className="flex-1 btn-primary"
+                disabled={!imageLoaded}
+              >
+                <span className="flex items-center justify-center">
+                  <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  </svg>
+                  Download
+                </span>
+              </button>
+              
+              <a 
+                href={downloadUrl || originalUrl || '#'}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex-1 btn-secondary"
+              >
+                <span className="flex items-center justify-center">
+                  <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                  </svg>
+                  View Full Size
+                </span>
+              </a>
+            </div>
           </div>
         )}
       </div>

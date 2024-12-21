@@ -1,20 +1,6 @@
-import { NFTStorage } from 'nft.storage';
+import { put } from '@vercel/blob';
+import { nanoid } from 'nanoid';
 
-// Initialize client with direct token (no JWT validation needed)
-const NFT_STORAGE_TOKEN = process.env.NFT_STORAGE_TOKEN?.trim();
-
-if (!NFT_STORAGE_TOKEN) {
-  throw new Error('NFT_STORAGE_TOKEN is not configured');
-}
-
-const client = new NFTStorage({ 
-  token: NFT_STORAGE_TOKEN,
-  endpoint: new URL('https://api.nft.storage') // Use base URL
-});
-
-/**
- * Converts an HTTP URL to IPFS URL format
- */
 export async function uploadToIPFS(imageUrl: string): Promise<string> {
   try {
     // Fetch the image
@@ -28,36 +14,37 @@ export async function uploadToIPFS(imageUrl: string): Promise<string> {
       throw new Error('Empty image blob');
     }
 
-    // Create file with proper MIME type
-    const file = new File([imageBlob], 'image.png', { 
-      type: imageBlob.type || 'image/png'
+    // Generate unique filename
+    const timestamp = Date.now();
+    const uniqueId = nanoid();
+    const fileName = `soba-${timestamp}-${uniqueId}.png`;
+
+    // Upload to Vercel Blob Storage
+    const { url } = await put(fileName, imageBlob, {
+      access: 'public',
+      addRandomSuffix: false // We already have unique names
     });
 
-    // Store the file
-    const cid = await client.storeBlob(file);
-    if (!cid) {
-      throw new Error('Failed to get CID from NFT.Storage');
+    if (!url) {
+      throw new Error('Failed to get URL from Vercel Blob Storage');
     }
 
-    return `ipfs://${cid}`;
+    return url;
+
   } catch (error) {
-    console.error('Detailed IPFS Upload Error:', {
+    console.error('Detailed Upload Error:', {
       error,
       message: error instanceof Error ? error.message : 'Unknown error',
-      stack: error instanceof Error ? error.stack : undefined
+      stack: error instanceof Error ? error.stack : undefined,
+      service: 'vercel-blob'
     });
-    throw new Error('Failed to store image on IPFS');
+    throw new Error('Failed to store image');
   }
 }
 
 /**
- * Converts an IPFS URL to HTTP URL format
+ * No need for URL conversion since Vercel Blob already provides HTTP URLs
  */
-export function ipfsToHttp(ipfsUrl: string): string {
-  if (!ipfsUrl) return '';
-  if (!ipfsUrl.startsWith('ipfs://')) return ipfsUrl;
-  
-  // Replace ipfs:// with the gateway URL
-  const cid = ipfsUrl.replace('ipfs://', '');
-  return `https://nftstorage.link/ipfs/${cid}`;
+export function ipfsToHttp(url: string): string {
+  return url;
 } 

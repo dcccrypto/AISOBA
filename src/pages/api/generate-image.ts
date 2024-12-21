@@ -154,29 +154,30 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         throw new Error('Model returned an invalid image URL');
       }
 
-      // Upload to IPFS and store both URLs
-      let ipfsUrl = '';
+      // Upload to Vercel Blob storage
+      let storedUrl = '';
       try {
-        ipfsUrl = await uploadToIPFS(imageUrl);
-      } catch (ipfsError) {
-        console.error('Error uploading to IPFS:', ipfsError);
-        // Continue with HTTP URL only if IPFS upload fails
-        ipfsUrl = imageUrl; // Fallback to HTTP URL
+        storedUrl = await uploadToIPFS(imageUrl);
+      } catch (uploadError) {
+        console.error('Error uploading to Vercel Blob:', uploadError);
+        // Continue with replicate URL if blob upload fails
+        storedUrl = imageUrl;
       }
       
       // Create the database record with both URLs
       const imageGeneration = await prisma.imageGeneration.create({
         data: {
           userId: user.id,
-          imageUrl: ipfsUrl,
+          imageUrl: storedUrl, // Use the Vercel Blob URL as primary
           prompt,
-          httpUrl: imageUrl
+          httpUrl: imageUrl  // Keep the original Replicate URL as backup
         } as Prisma.ImageGenerationUncheckedCreateInput
       });
 
       return res.status(200).json({ 
         success: true,
-        imageUrl 
+        imageUrl: storedUrl, // Return the Vercel Blob URL to frontend
+        originalUrl: imageUrl // Also return the original URL as backup
       });
 
     } catch (apiError: any) {
