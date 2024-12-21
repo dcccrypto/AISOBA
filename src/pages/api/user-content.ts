@@ -1,5 +1,5 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { prisma } from '../../lib/db';
+import prisma from '../../lib/prisma';
 import { ipfsToHttp } from '../../utils/ipfs';
 
 // Define the type for NFT selection
