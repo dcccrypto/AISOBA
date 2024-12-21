@@ -1,0 +1,11 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /_next/
+
+# Allow search engines to read JS/CSS files
+Allow: /*.js$
+Allow: /*.css$
+
+# Sitemap
+Sitemap: https://sobaverse.art/sitemap.xml 
