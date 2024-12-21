@@ -8,13 +8,15 @@ interface TokenPrice {
 
 async function fetchTokenPrice(): Promise<TokenPrice> {
   try {
+    const headers: HeadersInit = {
+      'X-API-KEY': process.env.NEXT_PUBLIC_BIRDEYE_API_KEY || '',
+      'accept': 'application/json',
+      'x-chain': 'solana'
+    };
+
     const response = await fetch('https://public-api.birdeye.so/defi/v3/token/market-data?address=25p2BoNp6qrJH5As6ek6H7Ei495oSkyZd3tGb97sqFmH', {
       method: 'GET',
-      headers: {
-        'X-API-KEY': 'fd1a074f532e410e805dc42913d1605c',
-        'accept': 'application/json',
-        'x-chain': 'solana'
-      }
+      headers
     });
     
     if (!response.ok) throw new Error('Failed to fetch price');
@@ -24,7 +26,7 @@ async function fetchTokenPrice(): Promise<TokenPrice> {
 
     return {
       price: data.data?.price || 0,
-      change24h: 0
+      change24h: data.data?.priceChange24h || 0
     };
   } catch (error) {
     console.error('Error fetching price:', error);
