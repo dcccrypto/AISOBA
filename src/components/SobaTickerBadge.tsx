@@ -1,37 +1,59 @@
 import { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 
 interface TokenPrice {
   price: number;
   change24h: number;
 }
 
-export default function SobaTickerBadge() {
-  const [priceData, setPriceData] = useState<TokenPrice | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  const fetchPrice = async () => {
-    try {
-      // Replace with your actual price API endpoint
-      const response = await fetch('https://api.coingecko.com/api/v3/simple/token_price/solana?contract_addresses=25p2BoNp6qrJH5As6ek6H7Ei495oSkyZd3tGb97sqFmH&vs_currencies=usd&include_24hr_change=true');
-      const data = await response.json();
-      const tokenData = data['25p2BoNp6qrJH5As6ek6H7Ei495oSkyZd3tGb97sqFmH'];
-      
-      setPriceData({
-        price: tokenData.usd,
-        change24h: tokenData.usd_24h_change
-      });
-    } catch (error) {
-      console.error('Error fetching price:', error);
-    } finally {
-      setLoading(false);
+async function fetchTokenPrice(): Promise<TokenPrice> {
+  try {
+    // Jupiter API for more reliable price data
+    const response = await fetch('https://price.jup.ag/v4/price?ids=soba');
+    const data = await response.json();
+    
+    if (!data.data.soba) {
+      throw new Error('Price data not available');
     }
+
+    // Calculate 24h change using Jupiter's data
+    const price = data.data.soba.price;
+    
+    // Fallback to coingecko for 24h change
+    const cgResponse = await fetch('https://api.coingecko.com/api/v3/simple/token_price/solana?contract_addresses=25p2BoNp6qrJH5As6ek6H7Ei495oSkyZd3tGb97sqFmH&vs_currencies=usd&include_24hr_change=true');
+    const cgData = await cgResponse.json();
+    const change24h = cgData['25p2BoNp6qrJH5As6ek6H7Ei495oSkyZd3tGb97sqFmH']?.usd_24h_change || 0;
+
+    return {
+      price,
+      change24h
+    };
+  } catch (error) {
+    console.error('Error fetching price:', error);
+    return {
+      price: 0,
+      change24h: 0
+    };
+  }
+}
+
+export default function SobaTickerBadge() {
+  const { data: priceData, isLoading } = useQuery({
+    queryKey: ['sobaPrice'],
+    queryFn: fetchTokenPrice,
+    refetchInterval: 30000, // Refetch every 30 seconds
+    initialData: { price: 0, change24h: 0 }
+  });
+
+  const formatPrice = (price: number) => {
+    if (price < 0.0001) return '<$0.0001';
+    return `$${price.toFixed(4)}`;
   };
 
-  useEffect(() => {
-    fetchPrice();
-    const interval = setInterval(fetchPrice, 30000); // Update every 30 seconds
-    return () => clearInterval(interval);
-  }, []);
+  const formatChange = (change: number) => {
+    const sign = change >= 0 ? '+' : '';
+    return `${sign}${change.toFixed(1)}%`;
+  };
 
   return (
     <div className="fixed bottom-4 right-4 z-50">
@@ -43,13 +65,15 @@ export default function SobaTickerBadge() {
       >
         <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
         <span className="text-[#ff6b00] font-bold">$SOBA</span>
-        {loading ? (
+        {isLoading ? (
           <span className="text-white animate-pulse">Loading...</span>
         ) : (
           <>
-            <span className="text-white">${priceData?.price.toFixed(4)}</span>
-            <span className={`text-sm ${priceData?.change24h >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-              {priceData?.change24h >= 0 ? '+' : ''}{priceData?.change24h.toFixed(1)}%
+            <span className="text-white">
+              {formatPrice(priceData.price)}
+            </span>
+            <span className={`text-sm ${priceData.change24h >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+              {formatChange(priceData.change24h)}
             </span>
           </>
         )}
