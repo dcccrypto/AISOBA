@@ -2,30 +2,33 @@ import { NextResponse } from 'next/server';
 import { headers } from 'next/headers';
 
 export async function GET() {
-  // Add CORS headers
-  const response = NextResponse.next();
-  response.headers.set('Access-Control-Allow-Origin', '*');
-  response.headers.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  response.headers.set('Access-Control-Allow-Headers', 'Content-Type');
+  // Create headers for CORS
+  const responseHeaders = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type'
+  };
 
   try {
     // Use Birdeye API with correct endpoint
-    const birdeyeResponse = await fetch('https://api.birdeye.so/v2/token/25p2BoNp6qrJH5As6ek6H7Ei495oSkyZd3tGb97sqFmH/price', {
+    const birdeyeResponse = await fetch('https://public-api.birdeye.so/defi/v3/token/market-data?address=25p2BoNp6qrJH5As6ek6H7Ei495oSkyZd3tGb97sqFmH', {
       method: 'GET',
       headers: {
         'X-API-KEY': process.env.NEXT_PUBLIC_BIRDEYE_API_KEY || '',
-        'Accept': 'application/json',
+        'accept': 'application/json',
+        'x-chain': 'solana'
       },
-      // Add cache control
       next: { revalidate: 30 } // Revalidate every 30 seconds
     });
 
     if (birdeyeResponse.ok) {
       const data = await birdeyeResponse.json();
-      return NextResponse.json({
-        price: data.data?.price || 0,
-        change24h: data.data?.priceChange24h || 0
-      }, { headers: response.headers });
+      if (data.success) {
+        return NextResponse.json({
+          price: data.data?.price || 0,
+          change24h: data.data?.priceChange24h || 0
+        }, { headers: responseHeaders });
+      }
     }
 
     // Fallback to Raydium API
@@ -36,13 +39,24 @@ export async function GET() {
     return NextResponse.json({
       price: raydiumData['25p2BoNp6qrJH5As6ek6H7Ei495oSkyZd3tGb97sqFmH'] || 0,
       change24h: 0
-    }, { headers: response.headers });
+    }, { headers: responseHeaders });
 
   } catch (error) {
     console.error('Error fetching price:', error);
     return NextResponse.json({
       price: 0,
       change24h: 0
-    }, { headers: response.headers });
+    }, { headers: responseHeaders });
   }
+}
+
+// Handle OPTIONS request for CORS
+export async function OPTIONS() {
+  return NextResponse.json({}, {
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type'
+    }
+  });
 } 
