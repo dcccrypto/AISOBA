@@ -5,6 +5,7 @@ import { ImageGeneration } from '@prisma/client';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { toast } from 'react-hot-toast';
 import NFTMinter from './NFTMinter';
+import ShareButton from './ShareButton';
 
 interface PaginatedResponse {
   images: ImageGenerationWithMintStatus[];
@@ -117,14 +118,20 @@ export default function GeneratedImagesGallery() {
       {selectedImage && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
           <div className="bg-[#2a2a2a] rounded-lg p-6 max-w-2xl w-full mx-4 relative">
-            <button
-              onClick={() => setSelectedImage(null)}
-              className="absolute top-4 right-4 text-gray-400 hover:text-white"
-            >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
+            <div className="flex justify-between items-center mb-4">
+              <ShareButton
+                imageUrl={selectedImage.imageUrl}
+                type="creation"
+              />
+              <button
+                onClick={() => setSelectedImage(null)}
+                className="text-gray-400 hover:text-white"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
 
             <div className="space-y-6">
               <img

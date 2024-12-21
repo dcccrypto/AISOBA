@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { saveAs } from 'file-saver';
+import { PREDEFINED_PROMPTS } from '../data/prompts';
 
 interface GenerateImageResponse {
   success: boolean;
@@ -150,6 +151,13 @@ export default function AIImageGenerator({ onImageGenerated }: AIImageGeneratorP
     }
   };
 
+  const handleSurpriseMe = () => {
+    const randomIndex = Math.floor(Math.random() * PREDEFINED_PROMPTS.length);
+    setPrompt(PREDEFINED_PROMPTS[randomIndex]);
+    // Smooth scroll to the textarea
+    document.querySelector('textarea')?.scrollIntoView({ behavior: 'smooth' });
+  };
+
   return (
     <div className="card hover:shadow-orange-500/20">
       <div className="flex flex-col space-y-4">
@@ -164,12 +172,36 @@ export default function AIImageGenerator({ onImageGenerated }: AIImageGeneratorP
           </div>
         </div>
 
+        <div className="flex gap-4 mb-4">
+          <button
+            onClick={handleSurpriseMe}
+            className="btn-secondary flex items-center gap-2"
+            disabled={generating}
+          >
+            <svg 
+              className="w-5 h-5" 
+              fill="none" 
+              stroke="currentColor" 
+              viewBox="0 0 24 24"
+            >
+              <path 
+                strokeLinecap="round" 
+                strokeLinejoin="round" 
+                strokeWidth={2} 
+                d="M13 10V3L4 14h7v7l9-11h-7z" 
+              />
+            </svg>
+            Surprise Me
+          </button>
+        </div>
+
         <div className="relative">
           <textarea
             className="input-primary min-h-[120px] resize-none"
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
             placeholder="Describe your NFT... Be creative!"
+            maxLength={500}
           />
           <div className="absolute bottom-3 right-3 text-gray-400 text-sm">
             {prompt.length}/500

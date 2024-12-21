@@ -1,7 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { prisma } from '../../lib/db';
+import { prisma } from '../../../lib/db';
 
-const ITEMS_PER_PAGE = 12;
+const ITEMS_PER_PAGE = 9;
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
@@ -9,17 +9,30 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    const { page = '1' } = req.query;
+    const { page = '1', wallet } = req.query;
     const pageNumber = parseInt(page as string);
 
-    // Get total count of verified NFTs
-    const totalItems = await prisma.nFT.count({
-      where: { verified: true },
+    if (!wallet) {
+      return res.status(400).json({ message: 'Wallet address is required' });
+    }
+
+    // Get user
+    const user = await prisma.user.findUnique({
+      where: { wallet: wallet as string },
     });
 
-    // Get paginated verified NFTs
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Get total count
+    const totalItems = await prisma.nFT.count({
+      where: { userId: user.id },
+    });
+
+    // Get paginated NFTs
     const nfts = await prisma.nFT.findMany({
-      where: { verified: true },
+      where: { userId: user.id },
       orderBy: { createdAt: 'desc' },
       skip: (pageNumber - 1) * ITEMS_PER_PAGE,
       take: ITEMS_PER_PAGE,
@@ -50,7 +63,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
 
   } catch (error) {
-    console.error('Error fetching gallery:', error);
-    return res.status(500).json({ message: 'Error fetching gallery' });
+    console.error('Error fetching user NFTs:', error);
+    return res.status(500).json({ message: 'Error fetching user NFTs' });
   }
 } 
