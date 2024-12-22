@@ -37,10 +37,36 @@ interface NFTMinterProps {
 // Update the collection address constant with your new collection's address
 const COLLECTION_ADDRESS = new PublicKey('JBvMgUVSD9oQiwcfQx932CCbheaRpmiSFoLpESwzGeyn');
 
-// Add this interface near the top of the file with other interfaces
+// Add these interfaces at the top of the file
 interface NFTCreator {
   address: string;
   share: number;
+}
+
+interface NFTMetadata {
+  name: string;
+  symbol: string;
+  description: string;
+  image: string;
+  uri: string;
+  external_url: string;
+  attributes: Array<{
+    trait_type: string;
+    value: string;
+  }>;
+  properties: {
+    files: Array<{
+      uri: string;
+      type: string;
+    }>;
+    category: string;
+    creators: NFTCreator[];
+    collection: {
+      name: string;
+      family: string;
+    };
+  };
+  seller_fee_basis_points: number;
 }
 
 export default function NFTMinter({ imageUrl, imageId = "", onClose, onSuccess, className = "" }: NFTMinterProps) {
@@ -225,6 +251,49 @@ export default function NFTMinter({ imageUrl, imageId = "", onClose, onSuccess, 
     }
   };
 
+  const prepareNFTData = async (): Promise<{ finalImageUrl: string; metadata: NFTMetadata }> => {
+    try {
+      // Upload image to Vercel Blob
+      const combinedImageBlob = await fetch(previewImage).then(r => r.blob());
+      const formData = new FormData();
+      formData.append('file', combinedImageBlob);
+
+      const uploadResponse = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!uploadResponse.ok) {
+        throw new Error('Failed to upload image');
+      }
+
+      const { url: finalImageUrl } = await uploadResponse.json();
+
+      // Get metadata from API
+      const metadataResponse = await fetch('/api/mint-nft', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          imageUrl: finalImageUrl,
+          wallet: publicKey?.toBase58(),
+          frameType: selectedOverlay ? overlayOptions.find(o => o.path === selectedOverlay)?.name : 'Basic Frame',
+        }),
+      });
+
+      if (!metadataResponse.ok) {
+        throw new Error('Failed to prepare metadata');
+      }
+
+      const { metadata } = await metadataResponse.json() as { metadata: NFTMetadata };
+      return { finalImageUrl, metadata };
+    } catch (error) {
+      console.error('Error preparing NFT data:', error);
+      throw error;
+    }
+  };
+
   const handleMint = async () => {
     if (!publicKey || !signTransaction) {
       toast.error('Please connect your wallet');
@@ -363,42 +432,6 @@ export default function NFTMinter({ imageUrl, imageId = "", onClose, onSuccess, 
       setIsMinting(false);
       onClose();
     }
-  };
-
-  const prepareNFTData = async () => {
-    // Upload image to Vercel Blob
-    const combinedImageBlob = await fetch(previewImage).then(r => r.blob());
-    const formData = new FormData();
-    formData.append('file', combinedImageBlob);
-
-    const uploadResponse = await fetch('/api/upload', {
-      method: 'POST',
-      body: formData,
-    });
-
-    if (!uploadResponse.ok) {
-      throw new Error('Failed to upload image');
-    }
-
-    const { url: finalImageUrl } = await uploadResponse.json();
-
-    // Get metadata
-    const response = await fetch('/api/mint-nft', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        imageUrl: finalImageUrl,
-        wallet: publicKey?.toBase58(),
-        frameType: overlayOptions.find(o => o.path === selectedOverlay)?.name,
-      }),
-    });
-
-    if (!response.ok) {
-      throw new Error('Failed to prepare NFT metadata');
-    }
-
-    const { metadata } = await response.json();
-    return { finalImageUrl, metadata };
   };
 
   return (
