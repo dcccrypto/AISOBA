@@ -33,6 +33,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       symbol: "SOBA",
       description: "Unique SOBA Chimp NFT with custom frame",
       image: imageUrl,
+      uri: imageUrl,
+      external_url: "https://sobaverse.art",
       attributes: [
         {
           trait_type: "Frame",
@@ -42,6 +44,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       properties: {
         files: [{ uri: imageUrl, type: "image/png" }],
         category: "image",
+        creators: [
+          {
+            address: wallet,
+            share: 100
+          }
+        ],
         collection: {
           name: "SOBA Chimps",
           family: "SOBA"
@@ -50,10 +58,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       seller_fee_basis_points: 500,
     };
 
-    return res.status(200).json({ 
-      metadata,
-      connection: connection.rpcEndpoint
-    });
+    return res.status(200).json({ metadata });
   } catch (error) {
     console.error('Error preparing NFT mint:', error);
     res.status(500).json({ message: 'Error preparing NFT mint' });
