@@ -224,6 +224,7 @@ export default function GeneratedImagesGallery() {
       {showMinter && selectedImage && (
         <NFTMinter
           imageUrl={selectedImage.imageUrl}
+          imageId={selectedImage.id}
           onClose={() => setShowMinter(false)}
           onSuccess={handleMintSuccess}
           className="animate-fadeIn"

@@ -1,5 +1,5 @@
-import { NextApiRequest, NextApiResponse } from 'next';
-import prisma from '../../lib/prisma';
+import type { NextApiRequest, NextApiResponse } from 'next';
+import { prisma } from '../../lib/prisma';
 import Replicate from 'replicate';
 import { Prediction } from 'replicate';
 import { ReplicatePrediction, ReplicateError } from '../../types/replicate';

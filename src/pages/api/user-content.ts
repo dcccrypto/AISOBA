@@ -1,8 +1,9 @@
-import { NextApiRequest, NextApiResponse } from 'next';
-import prisma from '../../lib/prisma';
+import type { NextApiRequest, NextApiResponse } from 'next';
+import { prisma } from '../../lib/prisma';
 import { ipfsToHttp } from '../../utils/ipfs';
+import type { Prisma } from '@prisma/client';
 
-// Define the type for NFT selection
+// Define the type for NFT selection and result
 type NFTSelect = {
   id: boolean;
   imageUrl: boolean;
@@ -10,6 +11,15 @@ type NFTSelect = {
   mintAddress: boolean;
   verified: boolean;
   createdAt: boolean;
+}
+
+type NFTResult = {
+  id: string;
+  imageUrl: string;
+  title: string | null;
+  mintAddress: string | null;
+  verified: boolean;
+  createdAt: Date;
 }
 
 // Define types for better type safety
@@ -20,6 +30,15 @@ type ImageGenerationSelect = {
   prompt: boolean;
   createdAt: boolean;
   userId: boolean;
+}
+
+type ImageGenerationResult = {
+  id: string;
+  imageUrl: string;
+  httpUrl: string | null;
+  prompt: string;
+  createdAt: Date;
+  userId: string;
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -55,11 +74,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           createdAt: true
         } as NFTSelect
       });
-      const processedNfts = nfts.map(nft => ({
-        ...nft,
-        imageUrl: ipfsToHttp(nft.imageUrl),
+
+      const formattedNFTs = nfts.map((nft: NFTResult) => ({
+        id: nft.id,
+        imageUrl: nft.imageUrl,
+        title: nft.title,
+        mintAddress: nft.mintAddress,
+        verified: nft.verified,
+        createdAt: nft.createdAt,
       }));
-      return res.status(200).json({ nfts: processedNfts });
+
+      return res.status(200).json({ nfts: formattedNFTs });
     }
 
     if (type === 'images') {
@@ -76,11 +101,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         } as ImageGenerationSelect
       });
 
-      const processedImages = images.map(image => ({
-        ...image,
-        imageUrl: image.httpUrl || ipfsToHttp(image.imageUrl),
+      const formattedImages = images.map((image: ImageGenerationResult) => ({
+        id: image.id,
+        imageUrl: image.imageUrl,
+        httpUrl: image.httpUrl,
+        prompt: image.prompt,
+        createdAt: image.createdAt,
+        userId: image.userId,
       }));
-      return res.status(200).json({ images: processedImages });
+
+      return res.status(200).json({ images: formattedImages });
     }
 
     return res.status(400).json({ message: 'Invalid content type' });
