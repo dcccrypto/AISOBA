@@ -231,12 +231,16 @@ export default function NFTMinter({ imageUrl, imageId = "", onClose, onSuccess, 
     }
 
     setIsMinting(true);
-    try {
-      // Upload image and get metadata
-      const { finalImageUrl, metadata } = await prepareNFTData();
+    console.log('Starting mint process...');
 
-      // Create mint account
+    try {
+      console.log('Preparing NFT data...');
+      const { finalImageUrl, metadata } = await prepareNFTData();
+      console.log('NFT data prepared:', { finalImageUrl, metadata });
+
       const mint = Keypair.generate();
+      console.log('Generated mint keypair:', mint.publicKey.toBase58());
+
       const rentExemptMint = await getMinimumBalanceForRentExemptMint(connection);
       
       // Get ATA for token
@@ -322,8 +326,12 @@ export default function NFTMinter({ imageUrl, imageId = "", onClose, onSuccess, 
 
       transaction.sign(mint);
       const signedTx = await signTransaction(transaction);
+      console.log('Sending transaction...');
       const txId = await connection.sendRawTransaction(signedTx.serialize());
+      console.log('Transaction sent:', txId);
+
       await connection.confirmTransaction(txId);
+      console.log('Transaction confirmed');
 
       // After successful minting, update both statuses
       await Promise.all([
@@ -334,7 +342,7 @@ export default function NFTMinter({ imageUrl, imageId = "", onClose, onSuccess, 
       onSuccess(mint.publicKey.toBase58());
       toast.success('NFT minted successfully!');
     } catch (error) {
-      console.error('Error minting:', error);
+      console.error('Detailed mint error:', error);
       toast.error('Failed to mint NFT');
     } finally {
       setIsMinting(false);
