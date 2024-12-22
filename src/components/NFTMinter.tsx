@@ -37,6 +37,12 @@ interface NFTMinterProps {
 // Update the collection address constant with your new collection's address
 const COLLECTION_ADDRESS = new PublicKey('JBvMgUVSD9oQiwcfQx932CCbheaRpmiSFoLpESwzGeyn');
 
+// Add this interface near the top of the file with other interfaces
+interface NFTCreator {
+  address: string;
+  share: number;
+}
+
 export default function NFTMinter({ imageUrl, imageId = "", onClose, onSuccess, className = "" }: NFTMinterProps) {
   const { publicKey, signTransaction } = useWallet();
   const { connection } = useConnection();
@@ -267,7 +273,7 @@ export default function NFTMinter({ imageUrl, imageId = "", onClose, onSuccess, 
               symbol: metadata.symbol,
               uri: metadata.uri,
               sellerFeeBasisPoints: metadata.seller_fee_basis_points,
-              creators: metadata.properties.creators.map(creator => ({
+              creators: metadata.properties.creators.map((creator: NFTCreator) => ({
                 address: new PublicKey(creator.address),
                 verified: false,
                 share: creator.share,
