@@ -1,6 +1,8 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { put } from '@vercel/blob';
 import { nanoid } from 'nanoid';
+import formidable from 'formidable';
+import { promises as fs } from 'fs';
 
 export const config = {
   api: {
@@ -17,17 +19,25 @@ export default async function handler(
   }
 
   try {
-    const formData = await req.formData();
-    const file = formData.get('file') as File;
-    
+    const form = formidable({});
+    const [fields, files] = await form.parse(req);
+    const file = files.file?.[0];
+
     if (!file) {
       return res.status(400).json({ error: 'No file provided' });
     }
 
+    // Read the file content
+    const fileData = await fs.readFile(file.filepath);
     const filename = `${nanoid()}.png`;
-    const blob = await put(filename, file, {
+
+    // Upload to Vercel Blob
+    const blob = await put(filename, fileData, {
       access: 'public',
     });
+
+    // Clean up temp file
+    await fs.unlink(file.filepath);
 
     return res.status(200).json({
       url: blob.url,
