@@ -241,6 +241,42 @@ export default function NFTMinter({ imageUrl, imageId = "", onClose, onSuccess, 
       const mint = Keypair.generate();
       console.log('Generated mint keypair:', mint.publicKey.toBase58());
 
+      // Generate the metadata address
+      const [metadataAddress] = PublicKey.findProgramAddressSync(
+        [
+          Buffer.from('metadata'),
+          TOKEN_METADATA_PROGRAM_ID.toBuffer(),
+          mint.publicKey.toBuffer(),
+        ],
+        TOKEN_METADATA_PROGRAM_ID
+      );
+
+      // Create metadata instruction with proper structure
+      const createMetadataIx = createCreateMetadataAccountV3Instruction(
+        {
+          metadata: metadataAddress,
+          mint: mint.publicKey,
+          mintAuthority: publicKey,
+          payer: publicKey,
+          updateAuthority: publicKey,
+        },
+        {
+          createMetadataAccountArgsV3: {
+            data: {
+              name: metadata.name,
+              symbol: metadata.symbol,
+              uri: metadata.uri,
+              sellerFeeBasisPoints: metadata.seller_fee_basis_points,
+              creators: metadata.properties.creators,
+              collection: null,
+              uses: null,
+            },
+            isMutable: true,
+            collectionDetails: null,
+          },
+        }
+      );
+
       // Get the minimum lamports required for rent exemption
       const lamports = await getMinimumBalanceForRentExemptMint(connection);
 
@@ -273,48 +309,6 @@ export default function NFTMinter({ imageUrl, imageId = "", onClose, onSuccess, 
         ata,
         publicKey,
         mint.publicKey,
-      );
-
-      // Create metadata PDA
-      const [metadataAddress] = PublicKey.findProgramAddressSync(
-        [
-          Buffer.from('metadata'),
-          TOKEN_METADATA_PROGRAM_ID.toBuffer(),
-          mint.publicKey.toBuffer(),
-        ],
-        TOKEN_METADATA_PROGRAM_ID,
-      );
-
-      // Create metadata instruction
-      const createMetadataIx = createCreateMetadataAccountV3Instruction(
-        {
-          metadata: metadataAddress,
-          mint: mint.publicKey,
-          mintAuthority: publicKey,
-          payer: publicKey,
-          updateAuthority: publicKey,
-        },
-        {
-          createMetadataAccountArgsV3: {
-            data: {
-              name: "SOBA Chimp",
-              symbol: "SOBA",
-              uri: metadata.uri,
-              sellerFeeBasisPoints: 500,
-              creators: [
-                {
-                  address: publicKey,
-                  verified: false,
-                  share: 100,
-                }
-              ],
-              collection: { key: COLLECTION_ADDRESS, verified: false },
-              uses: null,
-            },
-            isMutable: true,
-            collectionDetails: null,
-          },
-        }
       );
 
       // Create and send transaction

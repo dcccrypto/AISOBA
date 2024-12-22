@@ -44,7 +44,7 @@ export default function Document() {
         <meta name="apple-mobile-web-app-title" content="SOBA Verse" />
         <meta name="format-detection" content="telephone=no" />
         <meta name="mobile-web-app-capable" content="yes" />
-        <meta name="theme-color" content="#1a1a1a" />
+        <meta name="theme-color" content="#ffffff" />
 
         {/* Existing Google Analytics Script */}
         <script

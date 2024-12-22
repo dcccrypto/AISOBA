@@ -35,8 +35,20 @@ const nextConfig = {
           },
         ],
       },
+      {
+        source: '/:path*',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=31536000, immutable',
+          },
+        ],
+      },
     ]
-  }
+  },
+  images: {
+    domains: ['zsgek9c1rjweun9w.public.blob.vercel-storage.com'],
+  },
 }
 
 module.exports = nextConfig 
