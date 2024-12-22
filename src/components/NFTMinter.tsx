@@ -358,6 +358,7 @@ export default function NFTMinter({ imageUrl, imageId = "", onClose, onSuccess, 
 
       // Calculate minimum lamports for rent exemption
       const rentExemptionAmount = await getMinimumBalanceForRentExemptMint(connection);
+      console.log('Rent exemption amount:', rentExemptionAmount);
 
       // Generate the metadata address
       const [metadataAddress] = PublicKey.findProgramAddressSync(
@@ -368,14 +369,16 @@ export default function NFTMinter({ imageUrl, imageId = "", onClose, onSuccess, 
         ],
         TOKEN_METADATA_PROGRAM_ID
       );
+      console.log('Metadata address:', metadataAddress.toBase58());
 
       // Get associated token account address
       const associatedTokenAddress = await getAssociatedTokenAddress(
         mint.publicKey,
         publicKey
       );
+      console.log('Associated token address:', associatedTokenAddress.toBase58());
 
-      // Create metadata instruction with the properly structured metadata
+      // Create metadata instruction with proper structure
       const createMetadataIx = createCreateMetadataAccountV3Instruction(
         {
           metadata: metadataAddress,
@@ -386,7 +389,15 @@ export default function NFTMinter({ imageUrl, imageId = "", onClose, onSuccess, 
         },
         {
           createMetadataAccountArgsV3: {
-            data: metadata,
+            data: {
+              name: metadata.name,
+              symbol: metadata.symbol,
+              uri: metadata.uri,
+              sellerFeeBasisPoints: metadata.sellerFeeBasisPoints,
+              creators: metadata.creators,
+              collection: null,
+              uses: null,
+            },
             isMutable: true,
             collectionDetails: null,
           },
@@ -394,7 +405,10 @@ export default function NFTMinter({ imageUrl, imageId = "", onClose, onSuccess, 
       );
 
       // Create transaction
-      const transaction = new Transaction().add(
+      const transaction = new Transaction();
+      
+      // Add instructions in order
+      transaction.add(
         SystemProgram.createAccount({
           fromPubkey: publicKey,
           newAccountPubkey: mint.publicKey,
@@ -423,34 +437,60 @@ export default function NFTMinter({ imageUrl, imageId = "", onClose, onSuccess, 
         createMetadataIx
       );
 
-      // Set recent blockhash and fee payer
-      const { blockhash } = await connection.getLatestBlockhash();
+      // Get latest blockhash
+      const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('finalized');
+      console.log('Latest blockhash:', blockhash);
+      
       transaction.recentBlockhash = blockhash;
       transaction.feePayer = publicKey;
 
       // Sign transaction with mint account
       transaction.sign(mint);
+      console.log('Transaction signed by mint account');
 
       // Request wallet signature
       const signedTx = await signTransaction(transaction);
+      console.log('Transaction signed by wallet');
 
       // Send transaction
-      const txId = await connection.sendRawTransaction(signedTx.serialize());
-      await connection.confirmTransaction(txId);
+      const txId = await connection.sendRawTransaction(signedTx.serialize(), {
+        skipPreflight: false,
+        preflightCommitment: 'confirmed',
+      });
+      console.log('Transaction sent:', txId);
+
+      // Wait for confirmation with more detailed error handling
+      const confirmation = await connection.confirmTransaction({
+        signature: txId,
+        blockhash: blockhash,
+        lastValidBlockHeight: lastValidBlockHeight,
+      }, 'confirmed');
+
+      if (confirmation.value.err) {
+        throw new Error(`Transaction failed: ${JSON.stringify(confirmation.value.err)}`);
+      }
+
+      console.log('Transaction confirmed:', confirmation);
 
       // Record NFT in database
       await recordNFT(mint.publicKey.toBase58(), finalImageUrl);
+      console.log('NFT recorded in database');
 
       // Update mint status if imageId exists
       if (imageId) {
         await updateMintStatus(mint.publicKey.toBase58());
+        console.log('Mint status updated');
       }
 
       onSuccess(mint.publicKey.toBase58());
       toast.success('NFT minted successfully!');
     } catch (error) {
       console.error('Detailed mint error:', error);
-      toast.error('Failed to mint NFT');
+      if (error instanceof Error) {
+        toast.error(`Failed to mint NFT: ${error.message}`);
+      } else {
+        toast.error('Failed to mint NFT: Unknown error');
+      }
     } finally {
       setIsMinting(false);
     }
