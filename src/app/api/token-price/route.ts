@@ -15,7 +15,7 @@ export async function GET() {
       'https://public-api.birdeye.so/defi/v3/token/market-data?address=25p2BoNp6qrJH5As6ek6H7Ei495oSkyZd3tGb97sqFmH',
       {
         headers: {
-          'X-API-KEY': process.env.BIRDEYE_API_KEY,
+          'X-API-KEY': process.env.BIRDEYE_API_KEY || '',
           'Accept': 'application/json',
         },
         next: { revalidate: 60 }, // Cache for 60 seconds

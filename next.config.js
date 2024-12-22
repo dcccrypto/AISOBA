@@ -58,6 +58,14 @@ const nextConfig = {
   images: {
     domains: ['zsgek9c1rjweun9w.public.blob.vercel-storage.com'],
   },
+  async rewrites() {
+    return [
+      {
+        source: '/favicon-16x16.png',
+        destination: '/favicon.ico'
+      }
+    ];
+  },
 }
 
 module.exports = nextConfig 

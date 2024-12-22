@@ -46,7 +46,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         category: "image",
         creators: [
           {
-            address: wallet,
+            address: new PublicKey(wallet).toBase58(),
             share: 100
           }
         ],
