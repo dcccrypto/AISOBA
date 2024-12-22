@@ -28,7 +28,7 @@ import { toast } from 'react-hot-toast';
 
 interface NFTMinterProps {
   imageUrl: string;
-  imageId: string;
+  imageId?: string;
   onClose: () => void;
   onSuccess: (mintAddress: string) => void;
   className?: string;
@@ -37,7 +37,7 @@ interface NFTMinterProps {
 // Update the collection address constant with your new collection's address
 const COLLECTION_ADDRESS = new PublicKey('JBvMgUVSD9oQiwcfQx932CCbheaRpmiSFoLpESwzGeyn');
 
-export default function NFTMinter({ imageUrl, imageId, onClose, onSuccess, className = "" }: NFTMinterProps) {
+export default function NFTMinter({ imageUrl, imageId = "", onClose, onSuccess, className = "" }: NFTMinterProps) {
   const { publicKey, signTransaction } = useWallet();
   const { connection } = useConnection();
   const [selectedOverlay, setSelectedOverlay] = useState<string | null>(null);
@@ -169,6 +169,8 @@ export default function NFTMinter({ imageUrl, imageId, onClose, onSuccess, class
   };
 
   const updateMintStatus = async (mintAddress: string) => {
+    if (!imageId) return;
+
     try {
       const response = await fetch('/api/update-mint-status', {
         method: 'POST',
