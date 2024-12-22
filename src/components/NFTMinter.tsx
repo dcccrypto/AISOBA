@@ -241,20 +241,19 @@ export default function NFTMinter({ imageUrl, imageId = "", onClose, onSuccess, 
       const mint = Keypair.generate();
       console.log('Generated mint keypair:', mint.publicKey.toBase58());
 
-      const rentExemptMint = await getMinimumBalanceForRentExemptMint(connection);
-      
-      // Get ATA for token
-      const ata = await getAssociatedTokenAddress(mint.publicKey, publicKey);
+      // Get the minimum lamports required for rent exemption
+      const lamports = await getMinimumBalanceForRentExemptMint(connection);
 
-      // Create all instructions
+      // Create mint account
       const createMintAccountIx = SystemProgram.createAccount({
         fromPubkey: publicKey,
         newAccountPubkey: mint.publicKey,
         space: MINT_SIZE,
-        lamports: rentExemptMint,
+        lamports,
         programId: TOKEN_PROGRAM_ID,
       });
 
+      // Initialize mint instruction
       const initializeMintIx = createInitializeMintInstruction(
         mint.publicKey,
         0,
@@ -262,6 +261,13 @@ export default function NFTMinter({ imageUrl, imageId = "", onClose, onSuccess, 
         publicKey,
       );
 
+      // Get associated token account
+      const ata = await getAssociatedTokenAddress(
+        mint.publicKey,
+        publicKey,
+      );
+
+      // Create associated token account instruction
       const createAtaIx = createAssociatedTokenAccountInstruction(
         publicKey,
         ata,
@@ -269,14 +275,7 @@ export default function NFTMinter({ imageUrl, imageId = "", onClose, onSuccess, 
         mint.publicKey,
       );
 
-      const mintToIx = createMintToInstruction(
-        mint.publicKey,
-        ata,
-        publicKey,
-        1,
-      );
-
-      // Create metadata instruction
+      // Create metadata PDA
       const [metadataAddress] = PublicKey.findProgramAddressSync(
         [
           Buffer.from('metadata'),
@@ -286,6 +285,7 @@ export default function NFTMinter({ imageUrl, imageId = "", onClose, onSuccess, 
         TOKEN_METADATA_PROGRAM_ID,
       );
 
+      // Create metadata instruction
       const createMetadataIx = createCreateMetadataAccountV3Instruction(
         {
           metadata: metadataAddress,
@@ -301,14 +301,20 @@ export default function NFTMinter({ imageUrl, imageId = "", onClose, onSuccess, 
               symbol: "SOBA",
               uri: metadata.uri,
               sellerFeeBasisPoints: 500,
-              creators: null,
+              creators: [
+                {
+                  address: publicKey,
+                  verified: false,
+                  share: 100,
+                }
+              ],
               collection: { key: COLLECTION_ADDRESS, verified: false },
               uses: null,
             },
             isMutable: true,
             collectionDetails: null,
           },
-        },
+        }
       );
 
       // Create and send transaction
@@ -316,8 +322,13 @@ export default function NFTMinter({ imageUrl, imageId = "", onClose, onSuccess, 
         createMintAccountIx,
         initializeMintIx,
         createAtaIx,
-        mintToIx,
-        createMetadataIx,
+        createMintToInstruction(
+          mint.publicKey,
+          ata,
+          publicKey,
+          1
+        ),
+        createMetadataIx
       );
 
       const latestBlockhash = await connection.getLatestBlockhash();

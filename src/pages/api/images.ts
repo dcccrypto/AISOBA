@@ -1,55 +1,40 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { prisma } from '../../lib/prisma'
 
-const ITEMS_PER_PAGE = 12
-
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
-  if (req.method !== 'GET') {
-    return res.status(405).json({ message: 'Method not allowed' })
-  }
-
   try {
-    const page = parseInt(req.query.page as string) || 1
-    const limit = parseInt(req.query.limit as string) || ITEMS_PER_PAGE
-    const skip = (page - 1) * limit
+    const { page = '1', limit = '12' } = req.query;
+    const pageNumber = parseInt(page as string);
+    const pageSize = parseInt(limit as string);
 
-    // Get total count for pagination
-    const totalCount = await prisma.generatedImage.count()
-
-    // Fetch images with pagination
-    const images = await prisma.generatedImage.findMany({
-      skip,
-      take: limit,
-      orderBy: {
-        createdAt: 'desc'
+    const images = await prisma.imageGeneration.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: pageSize,
+      skip: (pageNumber - 1) * pageSize,
+      include: {
+        user: {
+          select: {
+            wallet: true,
+          },
+        },
       },
-      select: {
-        id: true,
-        imageUrl: true,
-        createdAt: true,
-        creator: true,
-        frameType: true,
-        mintAddress: true,
-      }
-    })
+    });
 
-    // Calculate if there's a next page
-    const hasMore = skip + images.length < totalCount
-    const nextPage = hasMore ? page + 1 : null
+    const total = await prisma.imageGeneration.count();
 
     return res.status(200).json({
       images,
-      nextPage,
-      totalCount,
-    })
+      total,
+      hasMore: total > pageNumber * pageSize,
+    });
   } catch (error) {
-    console.error('Error fetching images:', error)
+    console.error('Error fetching images:', error);
     return res.status(500).json({ 
-      message: 'Error fetching images',
-      error: process.env.NODE_ENV === 'development' ? error : undefined
-    })
+      message: 'Internal server error',
+      error: process.env.NODE_ENV === 'development' ? error : undefined 
+    });
   }
 } 
