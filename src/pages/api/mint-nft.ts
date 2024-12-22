@@ -11,6 +11,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     const { imageUrl, wallet, frameType } = req.body;
 
+    // Validate wallet address
+    try {
+      new PublicKey(wallet);
+    } catch (error) {
+      return res.status(400).json({ message: 'Invalid wallet address' });
+    }
+
     // Get user from database
     const user = await prisma.user.findUnique({
       where: { wallet },

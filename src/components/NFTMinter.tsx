@@ -316,6 +316,9 @@ export default function NFTMinter({ imageUrl, imageId = "", onClose, onSuccess, 
       const mint = Keypair.generate();
       console.log('Generated mint keypair:', mint.publicKey.toBase58());
 
+      // Calculate minimum lamports for rent exemption
+      const rentExemptionAmount = await getMinimumBalanceForRentExemptMint(connection);
+
       // Generate the metadata address
       const [metadataAddress] = PublicKey.findProgramAddressSync(
         [
@@ -326,7 +329,13 @@ export default function NFTMinter({ imageUrl, imageId = "", onClose, onSuccess, 
         TOKEN_METADATA_PROGRAM_ID
       );
 
-      // Create metadata instruction with proper structure
+      // Get associated token account address
+      const associatedTokenAddress = await getAssociatedTokenAddress(
+        mint.publicKey,
+        publicKey
+      );
+
+      // Create metadata instruction
       const createMetadataIx = createCreateMetadataAccountV3Instruction(
         {
           metadata: metadataAddress,
@@ -342,14 +351,11 @@ export default function NFTMinter({ imageUrl, imageId = "", onClose, onSuccess, 
               symbol: metadata.symbol,
               uri: metadata.uri,
               sellerFeeBasisPoints: metadata.seller_fee_basis_points,
-              creators: metadata.properties.creators.map(creator => {
-                const creatorPublicKey = new PublicKey(creator.address);
-                return {
-                  address: creatorPublicKey,
-                  verified: false,
-                  share: creator.share,
-                };
-              }),
+              creators: metadata.properties.creators.map(creator => ({
+                address: new PublicKey(creator.address),
+                verified: false,
+                share: creator.share,
+              })),
               collection: null,
               uses: null,
             },
@@ -359,72 +365,58 @@ export default function NFTMinter({ imageUrl, imageId = "", onClose, onSuccess, 
         }
       );
 
-      // Get the minimum lamports required for rent exemption
-      const lamports = await getMinimumBalanceForRentExemptMint(connection);
-
-      // Create mint account
-      const createMintAccountIx = SystemProgram.createAccount({
-        fromPubkey: publicKey,
-        newAccountPubkey: mint.publicKey,
-        space: MINT_SIZE,
-        lamports,
-        programId: TOKEN_PROGRAM_ID,
-      });
-
-      // Initialize mint instruction
-      const initializeMintIx = createInitializeMintInstruction(
-        mint.publicKey,
-        0,
-        publicKey,
-        publicKey,
-      );
-
-      // Get associated token account
-      const ata = await getAssociatedTokenAddress(
-        mint.publicKey,
-        publicKey,
-      );
-
-      // Create associated token account instruction
-      const createAtaIx = createAssociatedTokenAccountInstruction(
-        publicKey,
-        ata,
-        publicKey,
-        mint.publicKey,
-      );
-
-      // Create and send transaction
+      // Create transaction
       const transaction = new Transaction().add(
-        createMintAccountIx,
-        initializeMintIx,
-        createAtaIx,
+        SystemProgram.createAccount({
+          fromPubkey: publicKey,
+          newAccountPubkey: mint.publicKey,
+          space: MINT_SIZE,
+          lamports: rentExemptionAmount,
+          programId: TOKEN_PROGRAM_ID,
+        }),
+        createInitializeMintInstruction(
+          mint.publicKey,
+          0,
+          publicKey,
+          publicKey
+        ),
+        createAssociatedTokenAccountInstruction(
+          publicKey,
+          associatedTokenAddress,
+          publicKey,
+          mint.publicKey
+        ),
         createMintToInstruction(
           mint.publicKey,
-          ata,
+          associatedTokenAddress,
           publicKey,
           1
         ),
         createMetadataIx
       );
 
-      const latestBlockhash = await connection.getLatestBlockhash();
-      transaction.recentBlockhash = latestBlockhash.blockhash;
+      // Set recent blockhash and fee payer
+      const { blockhash } = await connection.getLatestBlockhash();
+      transaction.recentBlockhash = blockhash;
       transaction.feePayer = publicKey;
 
+      // Sign transaction with mint account
       transaction.sign(mint);
+
+      // Request wallet signature
       const signedTx = await signTransaction(transaction);
-      console.log('Sending transaction...');
+
+      // Send transaction
       const txId = await connection.sendRawTransaction(signedTx.serialize());
-      console.log('Transaction sent:', txId);
-
       await connection.confirmTransaction(txId);
-      console.log('Transaction confirmed');
 
-      // After successful minting, update both statuses
-      await Promise.all([
-        updateMintStatus(mint.publicKey.toBase58()),
-        recordNFT(mint.publicKey.toBase58(), finalImageUrl)
-      ]);
+      // Record NFT in database
+      await recordNFT(mint.publicKey.toBase58(), finalImageUrl);
+
+      // Update mint status if imageId exists
+      if (imageId) {
+        await updateMintStatus(mint.publicKey.toBase58());
+      }
 
       onSuccess(mint.publicKey.toBase58());
       toast.success('NFT minted successfully!');
@@ -433,7 +425,6 @@ export default function NFTMinter({ imageUrl, imageId = "", onClose, onSuccess, 
       toast.error('Failed to mint NFT');
     } finally {
       setIsMinting(false);
-      onClose();
     }
   };
 
