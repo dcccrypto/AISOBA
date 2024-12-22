@@ -5,29 +5,18 @@ interface TokenPrice {
   change24h: number;
 }
 
-const SOBA_TOKEN_ADDRESS = "25p2BoNp6qrJH5As6ek6H7Ei495oSkyZd3tGb97sqFmH";
-
 export default function SobaTickerBadge() {
   const { data: tokenPrice, isLoading } = useQuery<TokenPrice>({
     queryKey: ['tokenPrice'],
     queryFn: async () => {
-      const response = await fetch(
-        `https://data.solanatracker.io/price?token=${SOBA_TOKEN_ADDRESS}&priceChanges=true`,
-        {
-          method: 'GET',
-          headers: {
-            'accept': 'application/json',
-            'x-api-key': process.env.NEXT_PUBLIC_SOLANA_TRACKER_API_KEY || '',
-          }
-        }
-      );
+      const response = await fetch('/api/token-price');
       
       if (!response.ok) throw new Error('Failed to fetch price');
       const data = await response.json();
       
       return {
         price: data.price || 0,
-        change24h: data.priceChanges?.['24h'] || 0
+        change24h: data.change24h || 0
       };
     },
     refetchInterval: 30000, // Refetch every 30 seconds
