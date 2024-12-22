@@ -24,11 +24,12 @@ import {
   Account
 } from '@solana/spl-token';
 import { applyOverlay } from '../utils/imageProcessing';
+import { toast } from 'react-hot-toast';
 
 interface NFTMinterProps {
   imageUrl: string;
   onClose: () => void;
-  onSuccess?: () => void;
+  onSuccess: (mintAddress: string) => void;
   className?: string;
 }
 
@@ -166,18 +167,212 @@ export default function NFTMinter({ imageUrl, onClose, onSuccess, className = ""
     }
   };
 
+  const updateMintStatus = async (mintAddress: string) => {
+    try {
+      const response = await fetch('/api/update-mint-status', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          imageId: imageUrl, // This should be the image ID if available
+          mintAddress,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update mint status');
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Error updating mint status:', error);
+      throw error;
+    }
+  };
+
+  const recordNFT = async (mintAddress: string, imageUrl: string) => {
+    try {
+      const response = await fetch('/api/record-nft', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          mintAddress,
+          imageUrl,
+          wallet: publicKey?.toBase58(),
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to record NFT');
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Error recording NFT:', error);
+      throw error;
+    }
+  };
+
   const handleMint = async () => {
+    if (!publicKey || !signTransaction) {
+      toast.error('Please connect your wallet');
+      return;
+    }
+
+    if (!selectedOverlay) {
+      toast.error('Please select a frame');
+      return;
+    }
+
     setIsMinting(true);
     try {
-      // Add your minting logic here
-      await new Promise(resolve => setTimeout(resolve, 2000)); // Simulated minting
-      onSuccess?.();
-      onClose();
+      // Upload image and get metadata
+      const { finalImageUrl, metadata } = await prepareNFTData();
+
+      // Create mint account
+      const mint = Keypair.generate();
+      const rentExemptMint = await getMinimumBalanceForRentExemptMint(connection);
+      
+      // Get ATA for token
+      const ata = await getAssociatedTokenAddress(mint.publicKey, publicKey);
+
+      // Create all instructions
+      const createMintAccountIx = SystemProgram.createAccount({
+        fromPubkey: publicKey,
+        newAccountPubkey: mint.publicKey,
+        space: MINT_SIZE,
+        lamports: rentExemptMint,
+        programId: TOKEN_PROGRAM_ID,
+      });
+
+      const initializeMintIx = createInitializeMintInstruction(
+        mint.publicKey,
+        0,
+        publicKey,
+        publicKey,
+      );
+
+      const createAtaIx = createAssociatedTokenAccountInstruction(
+        publicKey,
+        ata,
+        publicKey,
+        mint.publicKey,
+      );
+
+      const mintToIx = createMintToInstruction(
+        mint.publicKey,
+        ata,
+        publicKey,
+        1,
+      );
+
+      // Create metadata instruction
+      const [metadataAddress] = PublicKey.findProgramAddressSync(
+        [
+          Buffer.from('metadata'),
+          TOKEN_METADATA_PROGRAM_ID.toBuffer(),
+          mint.publicKey.toBuffer(),
+        ],
+        TOKEN_METADATA_PROGRAM_ID,
+      );
+
+      const createMetadataIx = createCreateMetadataAccountV3Instruction(
+        {
+          metadata: metadataAddress,
+          mint: mint.publicKey,
+          mintAuthority: publicKey,
+          payer: publicKey,
+          updateAuthority: publicKey,
+        },
+        {
+          createMetadataAccountArgsV3: {
+            data: {
+              name: "SOBA Chimp",
+              symbol: "SOBA",
+              uri: metadata.uri,
+              sellerFeeBasisPoints: 500,
+              creators: null,
+              collection: { key: COLLECTION_ADDRESS, verified: false },
+              uses: null,
+            },
+            isMutable: true,
+            collectionDetails: null,
+          },
+        },
+      );
+
+      // Create and send transaction
+      const transaction = new Transaction().add(
+        createMintAccountIx,
+        initializeMintIx,
+        createAtaIx,
+        mintToIx,
+        createMetadataIx,
+      );
+
+      const latestBlockhash = await connection.getLatestBlockhash();
+      transaction.recentBlockhash = latestBlockhash.blockhash;
+      transaction.feePayer = publicKey;
+
+      transaction.sign(mint);
+      const signedTx = await signTransaction(transaction);
+      const txId = await connection.sendRawTransaction(signedTx.serialize());
+      await connection.confirmTransaction(txId);
+
+      // After successful minting, update both statuses
+      await Promise.all([
+        updateMintStatus(mint.publicKey.toBase58()),
+        recordNFT(mint.publicKey.toBase58(), finalImageUrl)
+      ]);
+
+      onSuccess(mint.publicKey.toBase58());
+      toast.success('NFT minted successfully!');
     } catch (error) {
       console.error('Error minting:', error);
+      toast.error('Failed to mint NFT');
     } finally {
       setIsMinting(false);
+      onClose();
     }
+  };
+
+  const prepareNFTData = async () => {
+    // Upload image to Vercel Blob
+    const combinedImageBlob = await fetch(previewImage).then(r => r.blob());
+    const formData = new FormData();
+    formData.append('file', combinedImageBlob);
+
+    const uploadResponse = await fetch('/api/upload', {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!uploadResponse.ok) {
+      throw new Error('Failed to upload image');
+    }
+
+    const { url: finalImageUrl } = await uploadResponse.json();
+
+    // Get metadata
+    const response = await fetch('/api/mint-nft', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        imageUrl: finalImageUrl,
+        wallet: publicKey?.toBase58(),
+        frameType: overlayOptions.find(o => o.path === selectedOverlay)?.name,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to prepare NFT metadata');
+    }
+
+    const { metadata } = await response.json();
+    return { finalImageUrl, metadata };
   };
 
   return (

@@ -9,7 +9,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    const { imageUrl, wallet } = req.body;
+    const { imageUrl, wallet, frameType } = req.body;
 
     // Get user from database
     const user = await prisma.user.findUnique({
@@ -27,23 +27,33 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         : 'https://api.devnet.solana.com'
     );
 
-    // Initialize Metaplex
-    const metaplex = Metaplex.make(connection);
-
     // Prepare NFT metadata
     const metadata = {
-      name: "AI Generated NFT",
-      description: "NFT created using AI",
+      name: "SOBA Chimp",
+      symbol: "SOBA",
+      description: "Unique SOBA Chimp NFT with custom frame",
       image: imageUrl,
-      seller_fee_basis_points: 500, // 5% royalty
+      attributes: [
+        {
+          trait_type: "Frame",
+          value: frameType || "Basic Frame"
+        }
+      ],
+      properties: {
+        files: [{ uri: imageUrl, type: "image/png" }],
+        category: "image",
+        collection: {
+          name: "SOBA Chimps",
+          family: "SOBA"
+        }
+      },
+      seller_fee_basis_points: 500,
     };
 
-    // Return the metadata for frontend to handle
-    res.status(200).json({ 
+    return res.status(200).json({ 
       metadata,
       connection: connection.rpcEndpoint
     });
-    
   } catch (error) {
     console.error('Error preparing NFT mint:', error);
     res.status(500).json({ message: 'Error preparing NFT mint' });

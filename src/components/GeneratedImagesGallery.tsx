@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { useInfiniteQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import { useInView } from 'react-intersection-observer';
 import ShareButton from './ShareButton';
 import { toast } from 'react-hot-toast';
+import NFTMinter from './NFTMinter';
 
 interface GeneratedImage {
   id: string;
@@ -21,7 +22,9 @@ interface APIResponse {
 
 export default function GeneratedImagesGallery() {
   const [selectedImage, setSelectedImage] = useState<GeneratedImage | null>(null);
+  const [showMinter, setShowMinter] = useState(false);
   const { ref, inView } = useInView();
+  const queryClient = useQueryClient();
 
   const {
     data,
@@ -55,6 +58,36 @@ export default function GeneratedImagesGallery() {
       fetchNextPage();
     }
   }, [inView, hasNextPage, isFetchingNextPage, fetchNextPage]);
+
+  const handleMintSuccess = async (mintAddress: string) => {
+    try {
+      // Update the mint status in the database
+      const response = await fetch('/api/update-mint-status', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          imageId: selectedImage?.id,
+          mintAddress,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update mint status');
+      }
+
+      // Invalidate and refetch the images query
+      await queryClient.invalidateQueries({ queryKey: ['generatedImages'] });
+      
+      toast.success('NFT minted successfully!');
+      setSelectedImage(null);
+      setShowMinter(false);
+    } catch (error) {
+      console.error('Error updating mint status:', error);
+      toast.error('Failed to update mint status');
+    }
+  };
 
   if (isError) {
     return (
@@ -151,7 +184,7 @@ export default function GeneratedImagesGallery() {
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4 text-sm">
+            <div className="grid grid-cols-2 gap-4 text-sm mb-4">
               <div>
                 <span className="text-gray-400">Creator</span>
                 <p className="text-white font-medium truncate">{selectedImage.creator}</p>
@@ -161,8 +194,40 @@ export default function GeneratedImagesGallery() {
                 <p className="text-white font-medium">{selectedImage.frameType}</p>
               </div>
             </div>
+
+            {!selectedImage.mintAddress && (
+              <button
+                onClick={() => setShowMinter(true)}
+                className="w-full bg-[#ff6b00] hover:bg-[#ff8533] text-white font-medium py-2 px-4 rounded-lg transition-colors"
+              >
+                Mint as NFT
+              </button>
+            )}
+
+            {selectedImage.mintAddress && (
+              <div className="text-center text-sm text-gray-400">
+                Minted • <a 
+                  href={`https://solscan.io/token/${selectedImage.mintAddress}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[#ff6b00] hover:text-[#ff8533]"
+                >
+                  View on Solscan
+                </a>
+              </div>
+            )}
           </div>
         </div>
+      )}
+
+      {/* NFT Minter Modal */}
+      {showMinter && selectedImage && (
+        <NFTMinter
+          imageUrl={selectedImage.imageUrl}
+          onClose={() => setShowMinter(false)}
+          onSuccess={handleMintSuccess}
+          className="animate-fadeIn"
+        />
       )}
     </>
   );
