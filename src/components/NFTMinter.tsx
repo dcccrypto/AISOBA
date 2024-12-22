@@ -69,6 +69,27 @@ interface NFTMetadata {
   seller_fee_basis_points: number;
 }
 
+// Add this interface at the top with other interfaces
+interface MetaplexMetadata {
+  name: string;
+  symbol: string;
+  uri: string;
+  sellerFeeBasisPoints: number;
+  creators: {
+    address: PublicKey;
+    verified: boolean;
+    share: number;
+  }[] | null;
+  collection: null;
+  uses: null;
+}
+
+// Add this interface for the creator type
+interface NFTCreatorResponse {
+  address: string;
+  share: number;
+}
+
 export default function NFTMinter({ imageUrl, imageId = "", onClose, onSuccess, className = "" }: NFTMinterProps) {
   const { publicKey, signTransaction } = useWallet();
   const { connection } = useConnection();
@@ -251,7 +272,7 @@ export default function NFTMinter({ imageUrl, imageId = "", onClose, onSuccess, 
     }
   };
 
-  const prepareNFTData = async (): Promise<{ finalImageUrl: string; metadata: NFTMetadata }> => {
+  const prepareNFTData = async (): Promise<{ finalImageUrl: string; metadata: MetaplexMetadata }> => {
     try {
       // Upload image to Vercel Blob
       const combinedImageBlob = await fetch(previewImage).then(r => r.blob());
@@ -286,8 +307,27 @@ export default function NFTMinter({ imageUrl, imageId = "", onClose, onSuccess, 
         throw new Error('Failed to prepare metadata');
       }
 
-      const { metadata } = await metadataResponse.json() as { metadata: NFTMetadata };
-      return { finalImageUrl, metadata };
+      const { metadata: fullMetadata } = await metadataResponse.json();
+
+      // Convert the full metadata to Metaplex format
+      const metaplexMetadata: MetaplexMetadata = {
+        name: fullMetadata.name,
+        symbol: fullMetadata.symbol,
+        uri: fullMetadata.uri,
+        sellerFeeBasisPoints: fullMetadata.seller_fee_basis_points,
+        creators: fullMetadata.properties.creators.map((creator: NFTCreatorResponse) => ({
+          address: new PublicKey(creator.address),
+          verified: false,
+          share: creator.share,
+        })),
+        collection: null,
+        uses: null,
+      };
+
+      return {
+        finalImageUrl,
+        metadata: metaplexMetadata,
+      };
     } catch (error) {
       console.error('Error preparing NFT data:', error);
       throw error;
@@ -335,7 +375,7 @@ export default function NFTMinter({ imageUrl, imageId = "", onClose, onSuccess, 
         publicKey
       );
 
-      // Create metadata instruction
+      // Create metadata instruction with the properly structured metadata
       const createMetadataIx = createCreateMetadataAccountV3Instruction(
         {
           metadata: metadataAddress,
@@ -346,19 +386,7 @@ export default function NFTMinter({ imageUrl, imageId = "", onClose, onSuccess, 
         },
         {
           createMetadataAccountArgsV3: {
-            data: {
-              name: metadata.name,
-              symbol: metadata.symbol,
-              uri: metadata.uri,
-              sellerFeeBasisPoints: metadata.seller_fee_basis_points,
-              creators: metadata.properties.creators.map(creator => ({
-                address: new PublicKey(creator.address),
-                verified: false,
-                share: creator.share,
-              })),
-              collection: null,
-              uses: null,
-            },
+            data: metadata,
             isMutable: true,
             collectionDetails: null,
           },
