@@ -342,11 +342,14 @@ export default function NFTMinter({ imageUrl, imageId = "", onClose, onSuccess, 
               symbol: metadata.symbol,
               uri: metadata.uri,
               sellerFeeBasisPoints: metadata.seller_fee_basis_points,
-              creators: metadata.properties.creators.map(creator => ({
-                address: new PublicKey(creator.address),
-                verified: false,
-                share: creator.share,
-              })),
+              creators: metadata.properties.creators.map(creator => {
+                const creatorPublicKey = new PublicKey(creator.address);
+                return {
+                  address: creatorPublicKey,
+                  verified: false,
+                  share: creator.share,
+                };
+              }),
               collection: null,
               uses: null,
             },
