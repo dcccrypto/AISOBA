@@ -11,6 +11,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     const { imageUrl, wallet, frameType } = req.body;
 
+    if (!imageUrl || !wallet || !frameType) {
+      return res.status(400).json({ 
+        message: 'Missing required fields', 
+        details: {
+          imageUrl: !imageUrl,
+          wallet: !wallet,
+          frameType: !frameType
+        }
+      });
+    }
+
     // Validate wallet address
     try {
       new PublicKey(wallet);
@@ -34,13 +45,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         : 'https://api.devnet.solana.com'
     );
 
-    // Prepare NFT metadata
+    // Add metadata URI generation
+    const metadataUri = `${process.env.NEXT_PUBLIC_APP_URL}/api/metadata/${wallet}/${Date.now()}`;
+    
     const metadata = {
       name: "SOBA Chimp",
       symbol: "SOBA",
       description: "Unique SOBA Chimp NFT with custom frame",
       image: imageUrl,
-      uri: imageUrl,
+      uri: metadataUri,
       external_url: "https://sobaverse.art",
       attributes: [
         {
@@ -68,6 +81,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(200).json({ metadata });
   } catch (error) {
     console.error('Error preparing NFT mint:', error);
-    res.status(500).json({ message: 'Error preparing NFT mint' });
+    return res.status(500).json({ 
+      message: 'Error preparing NFT mint',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
   }
 } 

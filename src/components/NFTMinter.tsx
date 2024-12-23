@@ -37,10 +37,18 @@ interface NFTMinterProps {
 // Update the collection address constant with your new collection's address
 const COLLECTION_ADDRESS = new PublicKey('JBvMgUVSD9oQiwcfQx932CCbheaRpmiSFoLpESwzGeyn');
 
-// Add these interfaces at the top of the file
-interface NFTCreator {
+// Update the interfaces at the top of the file
+interface Creator {
   address: string;
   share: number;
+}
+
+interface ConfirmationValue {
+  err: string | null;
+}
+
+interface TransactionConfirmation {
+  value: ConfirmationValue;
 }
 
 interface NFTMetadata {
@@ -60,7 +68,7 @@ interface NFTMetadata {
       type: string;
     }>;
     category: string;
-    creators: NFTCreator[];
+    creators: Creator[];
     collection: {
       name: string;
       family: string;
@@ -69,17 +77,17 @@ interface NFTMetadata {
   seller_fee_basis_points: number;
 }
 
-// Add this interface at the top with other interfaces
+// Update the interfaces at the top of the file
 interface MetaplexMetadata {
   name: string;
   symbol: string;
   uri: string;
   sellerFeeBasisPoints: number;
-  creators: {
+  creators: Array<{
     address: PublicKey;
     verified: boolean;
     share: number;
-  }[] | null;
+  }> | null;
   collection: null;
   uses: null;
 }
@@ -89,6 +97,30 @@ interface NFTCreatorResponse {
   address: string;
   share: number;
 }
+
+// Add retry logic for failed transactions
+const sendTransactionWithRetry = async (
+  connection: Connection,
+  signedTx: Transaction,
+  maxRetries = 3
+): Promise<string> => {
+  let lastError;
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      const txId = await connection.sendRawTransaction(signedTx.serialize(), {
+        skipPreflight: false,
+        preflightCommitment: 'confirmed',
+        maxRetries: 3
+      });
+      return txId;
+    } catch (error) {
+      console.error(`Transaction attempt ${i + 1} failed:`, error);
+      lastError = error;
+      await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1))); // Exponential backoff
+    }
+  }
+  throw lastError;
+};
 
 export default function NFTMinter({ imageUrl, imageId = "", onClose, onSuccess, className = "" }: NFTMinterProps) {
   const { publicKey, signTransaction } = useWallet();
@@ -290,7 +322,7 @@ export default function NFTMinter({ imageUrl, imageId = "", onClose, onSuccess, 
 
       const { url: finalImageUrl } = await uploadResponse.json();
 
-      // Get metadata from API
+      // Get metadata from API with proper error handling
       const metadataResponse = await fetch('/api/mint-nft', {
         method: 'POST',
         headers: {
@@ -304,24 +336,29 @@ export default function NFTMinter({ imageUrl, imageId = "", onClose, onSuccess, 
       });
 
       if (!metadataResponse.ok) {
-        throw new Error('Failed to prepare metadata');
+        const errorData = await metadataResponse.json();
+        throw new Error(errorData.message || 'Failed to prepare metadata');
       }
 
       const { metadata: fullMetadata } = await metadataResponse.json();
 
-      // Convert the full metadata to Metaplex format
+      // Ensure proper metadata structure for Metaplex
       const metaplexMetadata: MetaplexMetadata = {
         name: fullMetadata.name,
         symbol: fullMetadata.symbol,
-        uri: fullMetadata.uri,
-        sellerFeeBasisPoints: fullMetadata.seller_fee_basis_points,
-        creators: fullMetadata.properties.creators.map((creator: NFTCreatorResponse) => ({
+        uri: fullMetadata.uri || finalImageUrl,
+        sellerFeeBasisPoints: 500,
+        creators: fullMetadata.properties?.creators?.map((creator: Creator) => ({
           address: new PublicKey(creator.address),
           verified: false,
-          share: creator.share,
-        })),
+          share: creator.share
+        })) || (publicKey ? [{
+          address: publicKey,
+          verified: false,
+          share: 100
+        }] : []),
         collection: null,
-        uses: null,
+        uses: null
       };
 
       return {
@@ -345,10 +382,25 @@ export default function NFTMinter({ imageUrl, imageId = "", onClose, onSuccess, 
       return;
     }
 
+    const selectedFrame = overlayOptions.find(o => o.path === selectedOverlay);
+    if (!selectedFrame) {
+      toast.error('Invalid frame selected');
+      return;
+    }
+
+    if (sobaBalance < selectedFrame.required) {
+      toast.error(`Insufficient SOBA balance. Required: ${selectedFrame.required.toLocaleString()} SOBA`);
+      return;
+    }
+
     setIsMinting(true);
     console.log('Starting mint process...');
 
     try {
+      // Get latest blockhash first to ensure fresh transaction
+      const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('finalized');
+      console.log('Latest blockhash:', blockhash);
+
       console.log('Preparing NFT data...');
       const { finalImageUrl, metadata } = await prepareNFTData();
       console.log('NFT data prepared:', { finalImageUrl, metadata });
@@ -378,36 +430,12 @@ export default function NFTMinter({ imageUrl, imageId = "", onClose, onSuccess, 
       );
       console.log('Associated token address:', associatedTokenAddress.toBase58());
 
-      // Create metadata instruction with proper structure
-      const createMetadataIx = createCreateMetadataAccountV3Instruction(
-        {
-          metadata: metadataAddress,
-          mint: mint.publicKey,
-          mintAuthority: publicKey,
-          payer: publicKey,
-          updateAuthority: publicKey,
-        },
-        {
-          createMetadataAccountArgsV3: {
-            data: {
-              name: metadata.name,
-              symbol: metadata.symbol,
-              uri: metadata.uri,
-              sellerFeeBasisPoints: metadata.sellerFeeBasisPoints,
-              creators: metadata.creators,
-              collection: null,
-              uses: null,
-            },
-            isMutable: true,
-            collectionDetails: null,
-          },
-        }
-      );
-
-      // Create transaction
+      // Create transaction with proper ordering
       const transaction = new Transaction();
-      
-      // Add instructions in order
+      transaction.recentBlockhash = blockhash;
+      transaction.feePayer = publicKey;
+
+      // Add instructions in correct order
       transaction.add(
         SystemProgram.createAccount({
           fromPubkey: publicKey,
@@ -434,39 +462,51 @@ export default function NFTMinter({ imageUrl, imageId = "", onClose, onSuccess, 
           publicKey,
           1
         ),
-        createMetadataIx
+        createCreateMetadataAccountV3Instruction(
+          {
+            metadata: metadataAddress,
+            mint: mint.publicKey,
+            mintAuthority: publicKey,
+            payer: publicKey,
+            updateAuthority: publicKey,
+          },
+          {
+            createMetadataAccountArgsV3: {
+              data: metadata,
+              isMutable: true,
+              collectionDetails: null,
+            },
+          }
+        )
       );
 
-      // Get latest blockhash
-      const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('finalized');
-      console.log('Latest blockhash:', blockhash);
-      
-      transaction.recentBlockhash = blockhash;
-      transaction.feePayer = publicKey;
-
-      // Sign transaction with mint account
+      // Sign with mint account first
       transaction.sign(mint);
       console.log('Transaction signed by mint account');
 
-      // Request wallet signature
+      // Then get wallet signature
       const signedTx = await signTransaction(transaction);
       console.log('Transaction signed by wallet');
 
-      // Send transaction
-      const txId = await connection.sendRawTransaction(signedTx.serialize(), {
-        skipPreflight: false,
-        preflightCommitment: 'confirmed',
-      });
+      // Send with proper commitment
+      const txId = await sendTransactionWithRetry(connection, signedTx);
       console.log('Transaction sent:', txId);
 
-      // Wait for confirmation with more detailed error handling
-      const confirmation = await connection.confirmTransaction({
-        signature: txId,
-        blockhash: blockhash,
-        lastValidBlockHeight: lastValidBlockHeight,
-      }, 'confirmed');
+      // Wait for confirmation with timeout
+      const confirmation = await Promise.race([
+        connection.confirmTransaction({
+          signature: txId,
+          blockhash: blockhash,
+          lastValidBlockHeight: lastValidBlockHeight,
+        }, 'confirmed'),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Transaction confirmation timeout')), 
+            process.env.NEXT_PUBLIC_SOLANA_NETWORK === 'mainnet' ? 120000 : 60000
+          )
+        )
+      ]) as TransactionConfirmation;
 
-      if (confirmation.value.err) {
+      if (confirmation.value?.err) {
         throw new Error(`Transaction failed: ${JSON.stringify(confirmation.value.err)}`);
       }
 
