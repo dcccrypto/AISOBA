@@ -35,9 +35,9 @@ interface NFTMinterProps {
   className?: string;
 }
 
-// Update the collection address constant with your new collection's address
-const COLLECTION_ADDRESS = new PublicKey("FGXi3AdJUYs9GPiJzW8jpvribJRdgy4ioESSKJc76RZX");
-const COLLECTION_AUTHORITY = new PublicKey("FGXi3AdJUYs9GPiJzW8jpvribJRdgy4ioESSKJc76RZX");
+// Update collection constants
+const COLLECTION_ADDRESS = new PublicKey("JBvMgUVSD9oQiwcfQx932CCbheaRpmiSFoLpESwzGeyn");
+const COLLECTION_AUTHORITY = new PublicKey("BdvamG8zJbo9t5F7jwhhpusoe4rb6mgrAkScqnMychr2");
 
 // Update the interfaces at the top of the file
 interface Creator {
@@ -72,8 +72,9 @@ interface NFTMetadata {
     category: string;
     creators: Creator[];
     collection: {
-      name: string;
-      family: string;
+      name: "SOBA Chimps";
+      family: "SOBA";
+      address: "JBvMgUVSD9oQiwcfQx932CCbheaRpmiSFoLpESwzGeyn";
     };
   };
   seller_fee_basis_points: number;

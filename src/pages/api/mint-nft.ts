@@ -3,7 +3,7 @@ import { Connection, PublicKey } from '@solana/web3.js';
 import { Metaplex } from '@metaplex-foundation/js';
 import { prisma } from '../../lib/prisma';
 
-const COLLECTION_ADDRESS = "FGXi3AdJUYs9GPiJzW8jpvribJRdgy4ioESSKJc76RZX"; // Our collection address
+const COLLECTION_ADDRESS = "JBvMgUVSD9oQiwcfQx932CCbheaRpmiSFoLpESwzGeyn"; // Our collection address
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {

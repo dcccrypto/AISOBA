@@ -16,7 +16,7 @@ import {
 import bs58 from 'bs58';
 
 const prisma = new PrismaClient();
-const COLLECTION_ADDRESS = new PublicKey('BUj8NP6QESpG9JPVN2ca87ZbSZtuJ3JgUCCNCarKBG7r');
+const COLLECTION_ADDRESS = new PublicKey('JBvMgUVSD9oQiwcfQx932CCbheaRpmiSFoLpESwzGeyn');
 
 // Load collection authority from environment variable
 const getCollectionAuthority = () => {
@@ -26,27 +26,19 @@ const getCollectionAuthority = () => {
       throw new Error('Collection authority private key not found in environment variables');
     }
     
-    // Parse the array string into actual numbers
-    const privateKeyArray = JSON.parse(privateKeyString);
-    
-    // Validate the private key array
-    if (!Array.isArray(privateKeyArray) || privateKeyArray.length !== 64) {
-      throw new Error('Invalid private key format: must be an array of 64 numbers');
-    }
-    
-    // Convert to Uint8Array for Keypair
-    const privateKeyUint8 = new Uint8Array(privateKeyArray);
+    // Parse the private key (assuming it's stored as a base58 string)
+    const privateKeyUint8 = bs58.decode(privateKeyString);
     const keypair = Keypair.fromSecretKey(privateKeyUint8);
     
-    // Validate the keypair was created successfully
-    if (!keypair.publicKey || !keypair.secretKey) {
-      throw new Error('Failed to create valid keypair from private key');
+    // Validate the keypair matches expected authority
+    if (keypair.publicKey.toBase58() !== "BdvamG8zJbo9t5F7jwhhpusoe4rb6mgrAkScqnMychr2") {
+      throw new Error('Private key does not match expected collection authority');
     }
     
     return keypair;
   } catch (error) {
     console.error('Error parsing collection authority private key:', error);
-    throw error; // Throw the original error for better debugging
+    throw error;
   }
 };
 
