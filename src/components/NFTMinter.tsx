@@ -10,7 +10,8 @@ import {
 } from '@solana/web3.js';
 import { 
   createCreateMetadataAccountV3Instruction,
-  PROGRAM_ID as TOKEN_METADATA_PROGRAM_ID
+  PROGRAM_ID as TOKEN_METADATA_PROGRAM_ID,
+  createVerifyCollectionInstruction
 } from '@metaplex-foundation/mpl-token-metadata';
 import { 
   TOKEN_PROGRAM_ID,
@@ -35,7 +36,8 @@ interface NFTMinterProps {
 }
 
 // Update the collection address constant with your new collection's address
-const COLLECTION_ADDRESS = new PublicKey('JBvMgUVSD9oQiwcfQx932CCbheaRpmiSFoLpESwzGeyn');
+const COLLECTION_ADDRESS = new PublicKey("FGXi3AdJUYs9GPiJzW8jpvribJRdgy4ioESSKJc76RZX");
+const COLLECTION_AUTHORITY = new PublicKey("FGXi3AdJUYs9GPiJzW8jpvribJRdgy4ioESSKJc76RZX");
 
 // Update the interfaces at the top of the file
 interface Creator {
@@ -120,6 +122,56 @@ const sendTransactionWithRetry = async (
     }
   }
   throw lastError;
+};
+
+// Add helper functions for PDA derivation
+const getMetadataPDA = (mint: PublicKey): PublicKey => {
+  const [pda] = PublicKey.findProgramAddressSync(
+    [
+      Buffer.from('metadata'),
+      TOKEN_METADATA_PROGRAM_ID.toBuffer(),
+      mint.toBuffer(),
+    ],
+    TOKEN_METADATA_PROGRAM_ID
+  );
+  return pda;
+};
+
+const getMasterEditionPDA = (mint: PublicKey): PublicKey => {
+  const [pda] = PublicKey.findProgramAddressSync(
+    [
+      Buffer.from('metadata'),
+      TOKEN_METADATA_PROGRAM_ID.toBuffer(),
+      mint.toBuffer(),
+      Buffer.from('edition'),
+    ],
+    TOKEN_METADATA_PROGRAM_ID
+  );
+  return pda;
+};
+
+// Update collection verification function
+const verifyCollectionMetadata = async (connection: Connection, mintAddress: PublicKey) => {
+  try {
+    const metadataPDA = getMetadataPDA(mintAddress);
+    const accountInfo = await connection.getAccountInfo(metadataPDA);
+    
+    if (!accountInfo) {
+      throw new Error('Metadata account not found');
+    }
+
+    const collectionMetadataPDA = getMetadataPDA(COLLECTION_ADDRESS);
+    const collectionAccountInfo = await connection.getAccountInfo(collectionMetadataPDA);
+    
+    if (!collectionAccountInfo) {
+      throw new Error('Collection metadata account not found');
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Collection verification failed:', error);
+    return false;
+  }
 };
 
 export default function NFTMinter({ imageUrl, imageId = "", onClose, onSuccess, className = "" }: NFTMinterProps) {
@@ -304,66 +356,51 @@ export default function NFTMinter({ imageUrl, imageId = "", onClose, onSuccess, 
     }
   };
 
-  const prepareNFTData = async (): Promise<{ finalImageUrl: string; metadata: MetaplexMetadata }> => {
+  const prepareNFTData = async () => {
     try {
-      // Upload image to Vercel Blob
-      const combinedImageBlob = await fetch(previewImage).then(r => r.blob());
-      const formData = new FormData();
-      formData.append('file', combinedImageBlob);
-
-      const uploadResponse = await fetch('/api/upload', {
+      // Ensure image is properly uploaded and accessible
+      const imageResponse = await fetch('/api/upload', {
         method: 'POST',
-        body: formData,
+        body: JSON.stringify({ imageUrl }),
+        headers: {
+          'Content-Type': 'application/json',
+        },
       });
 
-      if (!uploadResponse.ok) {
+      if (!imageResponse.ok) {
         throw new Error('Failed to upload image');
       }
 
-      const { url: finalImageUrl } = await uploadResponse.json();
-
-      // Get metadata from API with proper error handling
+      const { url: finalImageUrl } = await imageResponse.json();
+      
+      // Ensure metadata uses the correct image URL
       const metadataResponse = await fetch('/api/mint-nft', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          imageUrl: finalImageUrl,
+          imageUrl: finalImageUrl, // Use the uploaded image URL
           wallet: publicKey?.toBase58(),
-          frameType: selectedOverlay ? overlayOptions.find(o => o.path === selectedOverlay)?.name : 'Basic Frame',
+          frameType: selectedOverlay
         }),
       });
 
       if (!metadataResponse.ok) {
-        const errorData = await metadataResponse.json();
-        throw new Error(errorData.message || 'Failed to prepare metadata');
+        throw new Error('Failed to prepare metadata');
       }
 
-      const { metadata: fullMetadata } = await metadataResponse.json();
-
-      // Ensure proper metadata structure for Metaplex
-      const metaplexMetadata: MetaplexMetadata = {
-        name: fullMetadata.name,
-        symbol: fullMetadata.symbol,
-        uri: fullMetadata.uri || finalImageUrl,
-        sellerFeeBasisPoints: 500,
-        creators: fullMetadata.properties?.creators?.map((creator: Creator) => ({
-          address: new PublicKey(creator.address),
-          verified: false,
-          share: creator.share
-        })) || (publicKey ? [{
-          address: publicKey,
-          verified: false,
-          share: 100
-        }] : []),
-        collection: null,
-        uses: null
-      };
+      const { metadata } = await metadataResponse.json();
 
       return {
         finalImageUrl,
-        metadata: metaplexMetadata,
+        metadata: {
+          ...metadata,
+          collection: {
+            key: COLLECTION_ADDRESS,
+            verified: false // Will be verified in the transaction
+          }
+        }
       };
     } catch (error) {
       console.error('Error preparing NFT data:', error);
@@ -397,6 +434,12 @@ export default function NFTMinter({ imageUrl, imageId = "", onClose, onSuccess, 
     console.log('Starting mint process...');
 
     try {
+      // Verify collection first
+      if (!(await verifyCollectionMetadata(connection, COLLECTION_ADDRESS))) {
+        toast.error('Collection verification failed');
+        return;
+      }
+
       // Get latest blockhash first to ensure fresh transaction
       const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('finalized');
       console.log('Latest blockhash:', blockhash);
@@ -437,6 +480,7 @@ export default function NFTMinter({ imageUrl, imageId = "", onClose, onSuccess, 
 
       // Add instructions in correct order
       transaction.add(
+        // 1. Create mint account
         SystemProgram.createAccount({
           fromPubkey: publicKey,
           newAccountPubkey: mint.publicKey,
@@ -444,24 +488,32 @@ export default function NFTMinter({ imageUrl, imageId = "", onClose, onSuccess, 
           lamports: rentExemptionAmount,
           programId: TOKEN_PROGRAM_ID,
         }),
+        
+        // 2. Initialize mint
         createInitializeMintInstruction(
           mint.publicKey,
           0,
           publicKey,
           publicKey
         ),
+        
+        // 3. Create associated token account
         createAssociatedTokenAccountInstruction(
           publicKey,
           associatedTokenAddress,
           publicKey,
           mint.publicKey
         ),
+        
+        // 4. Mint token
         createMintToInstruction(
           mint.publicKey,
           associatedTokenAddress,
           publicKey,
           1
         ),
+        
+        // 5. Create metadata
         createCreateMetadataAccountV3Instruction(
           {
             metadata: metadataAddress,
@@ -477,7 +529,17 @@ export default function NFTMinter({ imageUrl, imageId = "", onClose, onSuccess, 
               collectionDetails: null,
             },
           }
-        )
+        ),
+        
+        // 6. Verify collection
+        createVerifyCollectionInstruction({
+          metadata: metadataAddress,
+          collectionAuthority: COLLECTION_AUTHORITY,
+          payer: publicKey,
+          collectionMint: COLLECTION_ADDRESS,
+          collection: getMetadataPDA(COLLECTION_ADDRESS),
+          collectionMasterEditionAccount: getMasterEditionPDA(COLLECTION_ADDRESS)
+        })
       );
 
       // Sign with mint account first

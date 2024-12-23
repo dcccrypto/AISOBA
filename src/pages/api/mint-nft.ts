@@ -3,6 +3,8 @@ import { Connection, PublicKey } from '@solana/web3.js';
 import { Metaplex } from '@metaplex-foundation/js';
 import { prisma } from '../../lib/prisma';
 
+const COLLECTION_ADDRESS = "FGXi3AdJUYs9GPiJzW8jpvribJRdgy4ioESSKJc76RZX"; // Our collection address
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ message: 'Method not allowed' });
@@ -45,15 +47,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         : 'https://api.devnet.solana.com'
     );
 
-    // Add metadata URI generation
-    const metadataUri = `${process.env.NEXT_PUBLIC_APP_URL}/api/metadata/${wallet}/${Date.now()}`;
+    // Generate a unique metadata URI that we'll host
+    const metadataUri = `${process.env.NEXT_PUBLIC_APP_URL}/api/metadata/${Date.now()}`;
     
+    // Update metadata structure to match Metaplex standards
     const metadata = {
       name: "SOBA Chimp",
       symbol: "SOBA",
       description: "Unique SOBA Chimp NFT with custom frame",
       image: imageUrl,
-      uri: metadataUri,
+      animation_url: undefined,
       external_url: "https://sobaverse.art",
       attributes: [
         {
@@ -62,17 +65,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }
       ],
       properties: {
-        files: [{ uri: imageUrl, type: "image/png" }],
+        files: [{ 
+          uri: imageUrl,
+          type: "image/png",
+          cdn: true
+        }],
         category: "image",
-        creators: [
-          {
-            address: wallet,
-            share: 100
-          }
-        ],
+        creators: [{
+          address: wallet,
+          share: 100
+        }],
         collection: {
           name: "SOBA Chimps",
-          family: "SOBA"
+          family: "SOBA",
+          address: COLLECTION_ADDRESS
         }
       },
       seller_fee_basis_points: 500,
