@@ -39,7 +39,7 @@ model NFT {
   user        User     @relation(fields: [userId], references: [id])
 }
 
-model GeneratedImage {
+model generatedImage {
   id          String   @id @default(cuid())
   imageUrl    String
   createdAt   DateTime @default(now())

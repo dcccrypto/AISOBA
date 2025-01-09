@@ -34,18 +34,22 @@ export default function NFTGallery({ userOnly = false }: NFTGalleryProps) {
     hasNextPage,
     isFetchingNextPage,
     isLoading,
-  } = useInfiniteQuery<PaginatedNFTResponse>({
+  } = useInfiniteQuery<PaginatedNFTResponse, Error>({
     queryKey: ['nfts', userOnly, publicKey?.toString()],
     queryFn: async ({ pageParam = 1 }) => {
       const endpoint = userOnly ? '/api/user/nfts' : '/api/gallery';
       const response = await fetch(
         `${endpoint}?page=${pageParam}${userOnly ? `&wallet=${publicKey?.toString()}` : ''}`
       );
+      if (!response.ok) {
+        throw new Error('Failed to fetch NFTs');
+      }
       return response.json();
     },
-    initialPageParam: 1,
     getNextPageParam: (lastPage) => lastPage.hasMore ? lastPage.nextPage : undefined,
     enabled: !userOnly || !!publicKey,
+    staleTime: 60000,
+    cacheTime: 300000,
   });
 
   return (
@@ -60,7 +64,7 @@ export default function NFTGallery({ userOnly = false }: NFTGalleryProps) {
         <>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
             {data?.pages.map((page) =>
-              page.nfts.map((nft) => (
+              page.nfts.map((nft: NFT) => (
                 <NFTCard
                   key={nft.id}
                   imageUrl={nft.imageUrl}

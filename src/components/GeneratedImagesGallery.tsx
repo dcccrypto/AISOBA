@@ -35,13 +35,12 @@ export default function GeneratedImagesGallery() {
     isFetchingNextPage,
   } = useInfiniteQuery<APIResponse, Error>({
     queryKey: ['generatedImages'],
-    initialPageParam: 1,
-    queryFn: async ({ pageParam }) => {
+    queryFn: async ({ pageParam = 1 }) => {
       try {
         const response = await fetch(`/api/images?page=${pageParam}&limit=12`);
         if (!response.ok) throw new Error('Failed to fetch images');
-        const data: APIResponse = await response.json();
-        return data;
+        const data = await response.json();
+        return data as APIResponse;
       } catch (error) {
         console.error('Error fetching images:', error);
         throw error;
@@ -49,7 +48,7 @@ export default function GeneratedImagesGallery() {
     },
     getNextPageParam: (lastPage) => lastPage.nextPage ?? undefined,
     staleTime: 60000,
-    gcTime: 300000,
+    cacheTime: 300000,
     retry: 3,
   });
 

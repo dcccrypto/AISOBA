@@ -1,6 +1,6 @@
-import { NextApiRequest, NextApiResponse } from 'next';
-import formidable from 'formidable';
-import { uploadToStorage } from '../../utils/storage';
+import type { NextApiRequest, NextApiResponse } from 'next';
+import { IncomingForm, Fields, File, Files } from 'formidable';
+import { uploadToBlob } from '../../utils/storage';
 
 export const config = {
   api: {
@@ -8,37 +8,53 @@ export const config = {
   },
 };
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+interface UploadResponse {
+  success: boolean;
+  imageUrl?: string;
+  error?: string;
+}
+
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse<UploadResponse>
+) {
   if (req.method !== 'POST') {
-    return res.status(405).json({ message: 'Method not allowed' });
+    return res.status(405).json({ success: false, error: 'Method not allowed' });
   }
 
+  const form = new IncomingForm();
+
   try {
-    const form = formidable();
-    
-    const [fields, files] = await new Promise((resolve, reject) => {
+    const [fields, files] = await new Promise<[Fields, Files]>((resolve, reject) => {
       form.parse(req, (err, fields, files) => {
         if (err) reject(err);
         resolve([fields, files]);
       });
     });
 
-    if (!files.image) {
-      return res.status(400).json({ message: 'No image file provided' });
+    const imageFile = files.image?.[0];
+    if (!imageFile) {
+      return res.status(400).json({ success: false, error: 'No image file provided' });
     }
 
-    const imageFile = Array.isArray(files.image) ? files.image[0] : files.image;
     const imageId = Array.isArray(fields.imageId) ? fields.imageId[0] : fields.imageId;
+    if (!imageId) {
+      return res.status(400).json({ success: false, error: 'No image ID provided' });
+    }
 
-    // Upload to your storage service
-    const imageUrl = await uploadToStorage(imageFile, imageId);
+    // Upload to blob storage
+    const imageUrl = await uploadToBlob(imageFile.filepath, imageId);
 
-    return res.status(200).json({ imageUrl });
+    return res.status(200).json({
+      success: true,
+      imageUrl
+    });
+
   } catch (error) {
     console.error('Upload error:', error);
-    return res.status(500).json({ 
-      message: 'Error uploading image',
-      error: error instanceof Error ? error.message : 'Unknown error'
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to upload image'
     });
   }
 } 
