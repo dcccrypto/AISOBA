@@ -42,6 +42,19 @@ const getCollectionAuthority = () => {
   }
 };
 
+// Add proper verification checks
+const verifyCollectionMetadata = async (connection: Connection, mintAddress: PublicKey) => {
+  // ... existing code ...
+  
+  // Add collection verification instruction
+  const verifyInstruction = createVerifySizedCollectionItemInstruction({
+    // ... instruction accounts
+  });
+  
+  // Add to transaction
+  transaction.add(verifyInstruction);
+};
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ message: 'Method not allowed' });

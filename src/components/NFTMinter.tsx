@@ -11,7 +11,11 @@ import {
 import { 
   createCreateMetadataAccountV3Instruction,
   PROGRAM_ID as TOKEN_METADATA_PROGRAM_ID,
-  createVerifyCollectionInstruction
+  createVerifyCollectionInstruction,
+  createCreateMasterEditionV3Instruction,
+  createVerifySizedCollectionItemInstruction,
+  DataV2,
+  Creator as MetaplexCreator
 } from '@metaplex-foundation/mpl-token-metadata';
 import { 
   TOKEN_PROGRAM_ID,
@@ -80,18 +84,22 @@ interface NFTMetadata {
   seller_fee_basis_points: number;
 }
 
-// Update the interfaces at the top of the file
+// Add this type at the top with other interfaces
 interface MetaplexMetadata {
   name: string;
   symbol: string;
+  description: string;
   uri: string;
   sellerFeeBasisPoints: number;
-  creators: Array<{
-    address: PublicKey;
+  creators: {
+    address: string;
     verified: boolean;
     share: number;
-  }> | null;
-  collection: null;
+  }[];
+  collection: {
+    verified: boolean;
+    key: string;
+  };
   uses: null;
 }
 
@@ -359,52 +367,94 @@ export default function NFTMinter({ imageUrl, imageId = "", onClose, onSuccess, 
 
   const prepareNFTData = async () => {
     try {
-      // Ensure image is properly uploaded and accessible
-      const imageResponse = await fetch('/api/upload', {
-        method: 'POST',
-        body: JSON.stringify({ imageUrl }),
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!imageResponse.ok) {
-        throw new Error('Failed to upload image');
+      if (!publicKey) {
+        throw new Error('Wallet not connected');
       }
 
-      const { url: finalImageUrl } = await imageResponse.json();
-      
-      // Ensure metadata uses the correct image URL
-      const metadataResponse = await fetch('/api/mint-nft', {
+      // Process image first
+      const processedImage = await applyOverlay(imageUrl);
+      const formData = new FormData();
+      formData.append('image', processedImage);
+      formData.append('imageId', imageId);
+
+      const uploadResponse = await fetch('/api/upload', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          imageUrl: finalImageUrl, // Use the uploaded image URL
-          wallet: publicKey?.toBase58(),
-          frameType: selectedOverlay
-        }),
+        body: formData
       });
 
-      if (!metadataResponse.ok) {
-        throw new Error('Failed to prepare metadata');
+      if (!uploadResponse.ok) {
+        throw new Error(`Upload failed: ${uploadResponse.status}`);
       }
 
-      const { metadata } = await metadataResponse.json();
+      const { imageUrl: finalImageUrl } = await uploadResponse.json();
 
-      return {
-        finalImageUrl,
-        metadata: {
-          ...metadata,
-          collection: {
-            key: COLLECTION_ADDRESS,
-            verified: false // Will be verified in the transaction
+      // On-chain metadata (DataV2 format)
+      const onChainMetadata: DataV2 = {
+        name: "SOBA Chimp",
+        symbol: "SOBA",
+        uri: finalImageUrl,
+        sellerFeeBasisPoints: 500,
+        creators: [
+          {
+            address: COLLECTION_AUTHORITY, // Collection authority as primary creator
+            verified: true,
+            share: 95
+          },
+          {
+            address: publicKey, // Minter as secondary creator
+            verified: true,
+            share: 5
           }
-        }
+        ],
+        collection: {
+          verified: true, // Will be verified in the same transaction
+          key: COLLECTION_ADDRESS
+        },
+        uses: null
       };
+
+      // Display metadata for off-chain storage
+      const displayMetadata = {
+        name: "SOBA Chimp",
+        symbol: "SOBA",
+        description: "Unique SOBA Chimp NFT with custom frame",
+        image: finalImageUrl,
+        external_url: "https://sobaverse.art",
+        attributes: [
+          {
+            trait_type: "Frame",
+            value: selectedOverlay || "Basic Frame"
+          }
+        ],
+        properties: {
+          files: [{ 
+            uri: finalImageUrl,
+            type: "image/png",
+            cdn: true
+          }],
+          category: "image",
+          creators: [
+            {
+              address: COLLECTION_AUTHORITY.toBase58(),
+              share: 95
+            },
+            {
+              address: publicKey.toBase58(),
+              share: 5
+            }
+          ],
+          collection: {
+            name: "SOBA Chimps",
+            family: "SOBA",
+            address: COLLECTION_ADDRESS.toBase58()
+          }
+        },
+        seller_fee_basis_points: 500
+      };
+
+      return { finalImageUrl, metadata: onChainMetadata, displayMetadata };
     } catch (error) {
-      console.error('Error preparing NFT data:', error);
+      console.error('Error in prepareNFTData:', error);
       throw error;
     }
   };
@@ -415,185 +465,109 @@ export default function NFTMinter({ imageUrl, imageId = "", onClose, onSuccess, 
       return;
     }
 
-    if (!selectedOverlay) {
-      toast.error('Please select a frame');
-      return;
-    }
-
-    const selectedFrame = overlayOptions.find(o => o.path === selectedOverlay);
-    if (!selectedFrame) {
-      toast.error('Invalid frame selected');
-      return;
-    }
-
-    if (sobaBalance < selectedFrame.required) {
-      toast.error(`Insufficient SOBA balance. Required: ${selectedFrame.required.toLocaleString()} SOBA`);
-      return;
-    }
-
     setIsMinting(true);
-    console.log('Starting mint process...');
-
+    
     try {
-      // Verify collection first
-      if (!(await verifyCollectionMetadata(connection, COLLECTION_ADDRESS))) {
-        toast.error('Collection verification failed');
-        return;
-      }
-
-      // Get latest blockhash first to ensure fresh transaction
       const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('finalized');
-      console.log('Latest blockhash:', blockhash);
-
-      console.log('Preparing NFT data...');
-      const { finalImageUrl, metadata } = await prepareNFTData();
-      console.log('NFT data prepared:', { finalImageUrl, metadata });
-
       const mint = Keypair.generate();
-      console.log('Generated mint keypair:', mint.publicKey.toBase58());
+      
+      const { metadata, displayMetadata } = await prepareNFTData();
+      
+      const metadataAddress = getMetadataPDA(mint.publicKey);
+      const masterEditionAddress = getMasterEditionPDA(mint.publicKey);
+      const associatedTokenAddress = await getAssociatedTokenAddress(mint.publicKey, publicKey);
 
-      // Calculate minimum lamports for rent exemption
-      const rentExemptionAmount = await getMinimumBalanceForRentExemptMint(connection);
-      console.log('Rent exemption amount:', rentExemptionAmount);
+      // Get collection PDAs
+      const collectionMetadataAddress = getMetadataPDA(COLLECTION_ADDRESS);
+      const collectionMasterEditionAddress = getMasterEditionPDA(COLLECTION_ADDRESS);
 
-      // Generate the metadata address
-      const [metadataAddress] = PublicKey.findProgramAddressSync(
-        [
-          Buffer.from('metadata'),
-          TOKEN_METADATA_PROGRAM_ID.toBuffer(),
-          mint.publicKey.toBuffer(),
-        ],
-        TOKEN_METADATA_PROGRAM_ID
-      );
-      console.log('Metadata address:', metadataAddress.toBase58());
-
-      // Get associated token account address
-      const associatedTokenAddress = await getAssociatedTokenAddress(
-        mint.publicKey,
-        publicKey
-      );
-      console.log('Associated token address:', associatedTokenAddress.toBase58());
-
-      // Create transaction with proper ordering
       const transaction = new Transaction();
       transaction.recentBlockhash = blockhash;
+      transaction.lastValidBlockHeight = lastValidBlockHeight;
       transaction.feePayer = publicKey;
 
-      // Add instructions in correct order
       transaction.add(
-        // 1. Create mint account
         SystemProgram.createAccount({
           fromPubkey: publicKey,
           newAccountPubkey: mint.publicKey,
           space: MINT_SIZE,
-          lamports: rentExemptionAmount,
-          programId: TOKEN_PROGRAM_ID,
+          lamports: await getMinimumBalanceForRentExemptMint(connection),
+          programId: TOKEN_PROGRAM_ID
         }),
-        
-        // 2. Initialize mint
-        createInitializeMintInstruction(
-          mint.publicKey,
-          0,
-          publicKey,
-          publicKey
-        ),
-        
-        // 3. Create associated token account
-        createAssociatedTokenAccountInstruction(
-          publicKey,
-          associatedTokenAddress,
-          publicKey,
-          mint.publicKey
-        ),
-        
-        // 4. Mint token
-        createMintToInstruction(
-          mint.publicKey,
-          associatedTokenAddress,
-          publicKey,
-          1
-        ),
-        
-        // 5. Create metadata
+        createInitializeMintInstruction(mint.publicKey, 0, publicKey, publicKey),
+        createAssociatedTokenAccountInstruction(publicKey, associatedTokenAddress, publicKey, mint.publicKey),
+        createMintToInstruction(mint.publicKey, associatedTokenAddress, publicKey, 1),
         createCreateMetadataAccountV3Instruction(
           {
             metadata: metadataAddress,
             mint: mint.publicKey,
             mintAuthority: publicKey,
             payer: publicKey,
-            updateAuthority: publicKey,
+            updateAuthority: COLLECTION_AUTHORITY,
           },
           {
             createMetadataAccountArgsV3: {
               data: metadata,
               isMutable: true,
-              collectionDetails: null,
-            },
+              collectionDetails: null
+            }
           }
         ),
-        
-        // 6. Verify collection
-        createVerifyCollectionInstruction({
+        createCreateMasterEditionV3Instruction(
+          {
+            edition: masterEditionAddress,
+            mint: mint.publicKey,
+            updateAuthority: COLLECTION_AUTHORITY,
+            mintAuthority: publicKey,
+            payer: publicKey,
+            metadata: metadataAddress,
+          },
+          {
+            createMasterEditionArgs: {
+              maxSupply: 0
+            }
+          }
+        ),
+        createVerifySizedCollectionItemInstruction({
           metadata: metadataAddress,
           collectionAuthority: COLLECTION_AUTHORITY,
           payer: publicKey,
           collectionMint: COLLECTION_ADDRESS,
-          collection: getMetadataPDA(COLLECTION_ADDRESS),
-          collectionMasterEditionAccount: getMasterEditionPDA(COLLECTION_ADDRESS)
+          collection: collectionMetadataAddress,
+          collectionMasterEditionAccount: collectionMasterEditionAddress
         })
       );
 
-      // Sign with mint account first
+      // Sign and send transaction
       transaction.sign(mint);
-      console.log('Transaction signed by mint account');
-
-      // Then get wallet signature
       const signedTx = await signTransaction(transaction);
-      console.log('Transaction signed by wallet');
+      const txId = await connection.sendRawTransaction(signedTx.serialize(), {
+        skipPreflight: false,
+        preflightCommitment: 'confirmed',
+        maxRetries: 5
+      });
+      
+      await connection.confirmTransaction({
+        signature: txId,
+        blockhash,
+        lastValidBlockHeight
+      });
 
-      // Send with proper commitment
-      const txId = await sendTransactionWithRetry(connection, signedTx);
-      console.log('Transaction sent:', txId);
-
-      // Wait for confirmation with timeout
-      const confirmation = await Promise.race([
-        connection.confirmTransaction({
-          signature: txId,
-          blockhash: blockhash,
-          lastValidBlockHeight: lastValidBlockHeight,
-        }, 'confirmed'),
-        new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Transaction confirmation timeout')), 
-            process.env.NEXT_PUBLIC_SOLANA_NETWORK === 'mainnet' ? 120000 : 60000
-          )
-        )
-      ]) as TransactionConfirmation;
-
-      if (confirmation.value?.err) {
-        throw new Error(`Transaction failed: ${JSON.stringify(confirmation.value.err)}`);
-      }
-
-      console.log('Transaction confirmed:', confirmation);
-
-      // Record NFT in database
-      await recordNFT(mint.publicKey.toBase58(), finalImageUrl);
-      console.log('NFT recorded in database');
-
-      // Update mint status if imageId exists
-      if (imageId) {
-        await updateMintStatus(mint.publicKey.toBase58());
-        console.log('Mint status updated');
-      }
+      // Update database
+      await fetch('/api/update-mint-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          imageId,
+          mintAddress: mint.publicKey.toBase58() 
+        })
+      });
 
       onSuccess(mint.publicKey.toBase58());
       toast.success('NFT minted successfully!');
     } catch (error) {
-      console.error('Detailed mint error:', error);
-      if (error instanceof Error) {
-        toast.error(`Failed to mint NFT: ${error.message}`);
-      } else {
-        toast.error('Failed to mint NFT: Unknown error');
-      }
+      console.error('Mint error:', error);
+      toast.error('Failed to mint NFT');
     } finally {
       setIsMinting(false);
     }

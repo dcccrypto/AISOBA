@@ -1,8 +1,6 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { put } from '@vercel/blob';
-import { nanoid } from 'nanoid';
 import formidable from 'formidable';
-import { promises as fs } from 'fs';
+import { uploadToStorage } from '../../utils/storage';
 
 export const config = {
   api: {
@@ -10,40 +8,37 @@ export const config = {
   },
 };
 
-export default async function handler(
-  req: NextApiRequest,
-  res: NextApiResponse,
-) {
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return res.status(405).json({ message: 'Method not allowed' });
   }
 
   try {
-    const form = formidable({});
-    const [fields, files] = await form.parse(req);
-    const file = files.file?.[0];
+    const form = formidable();
+    
+    const [fields, files] = await new Promise((resolve, reject) => {
+      form.parse(req, (err, fields, files) => {
+        if (err) reject(err);
+        resolve([fields, files]);
+      });
+    });
 
-    if (!file) {
-      return res.status(400).json({ error: 'No file provided' });
+    if (!files.image) {
+      return res.status(400).json({ message: 'No image file provided' });
     }
 
-    // Read the file content
-    const fileData = await fs.readFile(file.filepath);
-    const filename = `${nanoid()}.png`;
+    const imageFile = Array.isArray(files.image) ? files.image[0] : files.image;
+    const imageId = Array.isArray(fields.imageId) ? fields.imageId[0] : fields.imageId;
 
-    // Upload to Vercel Blob
-    const blob = await put(filename, fileData, {
-      access: 'public',
-    });
+    // Upload to your storage service
+    const imageUrl = await uploadToStorage(imageFile, imageId);
 
-    // Clean up temp file
-    await fs.unlink(file.filepath);
-
-    return res.status(200).json({
-      url: blob.url,
-    });
+    return res.status(200).json({ imageUrl });
   } catch (error) {
-    console.error('Error uploading file:', error);
-    return res.status(500).json({ error: 'Error uploading file' });
+    console.error('Upload error:', error);
+    return res.status(500).json({ 
+      message: 'Error uploading image',
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
   }
 } 

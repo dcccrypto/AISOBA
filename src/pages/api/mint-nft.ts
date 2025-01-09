@@ -50,7 +50,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Generate a unique metadata URI that we'll host
     const metadataUri = `${process.env.NEXT_PUBLIC_APP_URL}/api/metadata/${Date.now()}`;
     
-    // Update metadata structure to match Metaplex standards
+    // Update metadata structure to match collection standards
     const metadata = {
       name: "SOBA Chimp",
       symbol: "SOBA",
