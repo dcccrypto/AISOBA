@@ -177,7 +177,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(200).json({ 
         success: true,
         imageUrl: storedUrl, // Return the Vercel Blob URL to frontend
-        originalUrl: imageUrl // Also return the original URL as backup
+        originalUrl: imageUrl, // Also return the original URL as backup
+        imageId: imageGeneration.id // Return the generated image ID
       });
 
     } catch (apiError: any) {

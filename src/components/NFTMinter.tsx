@@ -6,7 +6,9 @@ import {
   Transaction, 
   SystemProgram,
   LAMPORTS_PER_SOL,
-  Keypair
+  Keypair,
+  ComputeBudgetProgram,
+  sendAndConfirmRawTransaction
 } from '@solana/web3.js';
 import { 
   createCreateMetadataAccountV3Instruction,
@@ -365,28 +367,101 @@ export default function NFTMinter({ imageUrl, imageId = "", onClose, onSuccess, 
     }
   };
 
+  const applyOverlay = async (imageUrl: string): Promise<HTMLCanvasElement | null> => {
+    if (!selectedOverlay) {
+      // If no overlay, still return a canvas with the original image
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return null;
+      
+      const image = await loadImage(imageUrl);
+      canvas.width = image.width;
+      canvas.height = image.height;
+      ctx.drawImage(image, 0, 0);
+      return canvas;
+    }
+
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    
+    if (!ctx) return null;
+
+    try {
+      // Load both images
+      const [image, frame] = await Promise.all([
+        loadImage(imageUrl),
+        loadImage(selectedOverlay)
+      ]);
+
+      // Set canvas size to match the original image
+      canvas.width = image.width;
+      canvas.height = image.height;
+
+      // Draw the original image
+      ctx.drawImage(image, 0, 0);
+      
+      // Draw the frame
+      ctx.drawImage(frame, 0, 0, canvas.width, canvas.height);
+
+      return canvas;
+    } catch (error) {
+      console.error('Error applying overlay:', error);
+      return null;
+    }
+  };
+
   const prepareNFTData = async () => {
     try {
       if (!publicKey) {
         throw new Error('Wallet not connected');
       }
 
+      if (!imageId) {
+        throw new Error('Image ID is required');
+      }
+
       // Process image first
-      const processedImage = await applyOverlay(imageUrl);
+      const processedCanvas = await applyOverlay(imageUrl);
+      if (!processedCanvas) {
+        throw new Error('Failed to process image');
+      }
+
+      // Convert canvas to blob with proper type
+      const blob = await new Promise<Blob>((resolve, reject) => {
+        processedCanvas.toBlob(
+          (blob) => {
+            if (blob) {
+              resolve(blob);
+            } else {
+              reject(new Error('Failed to convert canvas to blob'));
+            }
+          },
+          'image/png',
+          1.0
+        );
+      });
+
+      // Create a File object from the blob
+      const file = new File([blob], 'image.png', { type: 'image/png' });
+      
       const formData = new FormData();
-      formData.append('image', processedImage);
+      formData.append('image', file);
       formData.append('imageId', imageId);
 
+      console.log('Uploading image...', { imageId });
       const uploadResponse = await fetch('/api/upload', {
         method: 'POST',
         body: formData
       });
 
       if (!uploadResponse.ok) {
+        const errorText = await uploadResponse.text();
+        console.error('Upload failed:', errorText);
         throw new Error(`Upload failed: ${uploadResponse.status}`);
       }
 
       const { imageUrl: finalImageUrl } = await uploadResponse.json();
+      console.log('Upload successful:', finalImageUrl);
 
       // On-chain metadata (DataV2 format)
       const onChainMetadata: DataV2 = {
@@ -396,18 +471,18 @@ export default function NFTMinter({ imageUrl, imageId = "", onClose, onSuccess, 
         sellerFeeBasisPoints: 500,
         creators: [
           {
-            address: COLLECTION_AUTHORITY, // Collection authority as primary creator
-            verified: true,
-            share: 95
+            address: COLLECTION_AUTHORITY,
+            verified: false,
+            share: 5
           },
           {
-            address: publicKey, // Minter as secondary creator
+            address: publicKey,
             verified: true,
-            share: 5
+            share: 95
           }
         ],
         collection: {
-          verified: true, // Will be verified in the same transaction
+          verified: false,
           key: COLLECTION_ADDRESS
         },
         uses: null
@@ -436,11 +511,11 @@ export default function NFTMinter({ imageUrl, imageId = "", onClose, onSuccess, 
           creators: [
             {
               address: COLLECTION_AUTHORITY.toBase58(),
-              share: 95
+              share: 5
             },
             {
               address: publicKey.toBase58(),
-              share: 5
+              share: 95
             }
           ],
           collection: {
@@ -468,25 +543,31 @@ export default function NFTMinter({ imageUrl, imageId = "", onClose, onSuccess, 
     setIsMinting(true);
     
     try {
-      const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('finalized');
       const mint = Keypair.generate();
-      
       const { metadata, displayMetadata } = await prepareNFTData();
       
       const metadataAddress = getMetadataPDA(mint.publicKey);
       const masterEditionAddress = getMasterEditionPDA(mint.publicKey);
       const associatedTokenAddress = await getAssociatedTokenAddress(mint.publicKey, publicKey);
 
-      // Get collection PDAs
-      const collectionMetadataAddress = getMetadataPDA(COLLECTION_ADDRESS);
-      const collectionMasterEditionAddress = getMasterEditionPDA(COLLECTION_ADDRESS);
+      // Add compute budget instructions with higher priority
+      const modifyComputeUnits = ComputeBudgetProgram.setComputeUnitLimit({
+        units: 600000  // Increased from 300000
+      });
+      const addPriorityFee = ComputeBudgetProgram.setComputeUnitPrice({
+        microLamports: 100000  // Increased from 50000
+      });
 
+      // Get fresh blockhash with confirmed commitment
+      const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('confirmed');
+      
       const transaction = new Transaction();
       transaction.recentBlockhash = blockhash;
-      transaction.lastValidBlockHeight = lastValidBlockHeight;
       transaction.feePayer = publicKey;
 
       transaction.add(
+        modifyComputeUnits,
+        addPriorityFee,
         SystemProgram.createAccount({
           fromPubkey: publicKey,
           newAccountPubkey: mint.publicKey,
@@ -503,7 +584,7 @@ export default function NFTMinter({ imageUrl, imageId = "", onClose, onSuccess, 
             mint: mint.publicKey,
             mintAuthority: publicKey,
             payer: publicKey,
-            updateAuthority: COLLECTION_AUTHORITY,
+            updateAuthority: publicKey,
           },
           {
             createMetadataAccountArgsV3: {
@@ -517,7 +598,7 @@ export default function NFTMinter({ imageUrl, imageId = "", onClose, onSuccess, 
           {
             edition: masterEditionAddress,
             mint: mint.publicKey,
-            updateAuthority: COLLECTION_AUTHORITY,
+            updateAuthority: publicKey,
             mintAuthority: publicKey,
             payer: publicKey,
             metadata: metadataAddress,
@@ -527,31 +608,51 @@ export default function NFTMinter({ imageUrl, imageId = "", onClose, onSuccess, 
               maxSupply: 0
             }
           }
-        ),
-        createVerifySizedCollectionItemInstruction({
-          metadata: metadataAddress,
-          collectionAuthority: COLLECTION_AUTHORITY,
-          payer: publicKey,
-          collectionMint: COLLECTION_ADDRESS,
-          collection: collectionMetadataAddress,
-          collectionMasterEditionAccount: collectionMasterEditionAddress
-        })
+        )
       );
 
-      // Sign and send transaction
+      // Sign and send transaction with higher priority
       transaction.sign(mint);
       const signedTx = await signTransaction(transaction);
+      
       const txId = await connection.sendRawTransaction(signedTx.serialize(), {
-        skipPreflight: false,
+        skipPreflight: true, // Skip preflight to avoid blockhash expiry during simulation
         preflightCommitment: 'confirmed',
         maxRetries: 5
       });
-      
-      await connection.confirmTransaction({
-        signature: txId,
-        blockhash,
-        lastValidBlockHeight
+
+      // Wait for confirmation with exponential backoff
+      let retries = 5;
+      let delay = 1000; // Start with 1 second delay
+      while (retries > 0) {
+        try {
+          await connection.confirmTransaction({
+            signature: txId,
+            blockhash,
+            lastValidBlockHeight
+          }, 'confirmed');
+          break;
+        } catch (error) {
+          console.log(`Retry ${6 - retries} failed, retrying in ${delay}ms...`);
+          retries--;
+          if (retries === 0) throw error;
+          await new Promise(resolve => setTimeout(resolve, delay));
+          delay *= 2; // Double the delay for next retry
+        }
+      }
+
+      // Verify collection through backend
+      const verifyResponse = await fetch('/api/verify-collection', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          mintAddress: mint.publicKey.toBase58() 
+        })
       });
+
+      if (!verifyResponse.ok) {
+        throw new Error('Failed to verify collection');
+      }
 
       // Update database
       await fetch('/api/update-mint-status', {

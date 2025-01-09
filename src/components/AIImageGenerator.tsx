@@ -7,11 +7,12 @@ interface GenerateImageResponse {
   success: boolean;
   imageUrl: string;
   originalUrl: string;
+  imageId: string;
   message?: string;
 }
 
 interface AIImageGeneratorProps {
-  onImageGenerated: (url: string) => void;
+  onImageGenerated: (url: string, imageId: string) => void;
 }
 
 export default function AIImageGenerator({ onImageGenerated }: AIImageGeneratorProps) {
@@ -132,7 +133,7 @@ export default function AIImageGenerator({ onImageGenerated }: AIImageGeneratorP
       // Store both URLs, with null checks
       setDownloadUrl(data.imageUrl || null);
       setOriginalUrl(data.originalUrl || data.imageUrl || null);
-      onImageGenerated(data.imageUrl);
+      onImageGenerated(data.imageUrl, data.imageId);
       setRetryCount(0);
       
       // Refresh remaining generations

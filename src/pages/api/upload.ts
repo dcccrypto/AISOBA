@@ -25,25 +25,33 @@ export default async function handler(
   const form = new IncomingForm();
 
   try {
+    console.log('Processing upload request...');
     const [fields, files] = await new Promise<[Fields, Files]>((resolve, reject) => {
       form.parse(req, (err, fields, files) => {
-        if (err) reject(err);
+        if (err) {
+          console.error('Form parsing error:', err);
+          reject(err);
+        }
+        console.log('Form parsed:', { fields, files: Object.keys(files) });
         resolve([fields, files]);
       });
     });
 
     const imageFile = files.image?.[0];
     if (!imageFile) {
+      console.error('No image file in request:', { files });
       return res.status(400).json({ success: false, error: 'No image file provided' });
     }
 
     const imageId = Array.isArray(fields.imageId) ? fields.imageId[0] : fields.imageId;
     if (!imageId) {
+      console.error('No imageId in request:', { fields });
       return res.status(400).json({ success: false, error: 'No image ID provided' });
     }
 
-    // Upload to blob storage
+    console.log('Uploading to blob storage...', { imageId });
     const imageUrl = await uploadToBlob(imageFile.filepath, imageId);
+    console.log('Upload successful:', { imageUrl });
 
     return res.status(200).json({
       success: true,
@@ -54,7 +62,7 @@ export default async function handler(
     console.error('Upload error:', error);
     return res.status(500).json({
       success: false,
-      error: 'Failed to upload image'
+      error: error instanceof Error ? error.message : 'Failed to upload image'
     });
   }
 } 

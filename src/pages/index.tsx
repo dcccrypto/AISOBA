@@ -17,11 +17,11 @@ const WalletMultiButtonDynamic = dynamic(
 
 export default function Home() {
   const [hasEnoughTokens, setHasEnoughTokens] = useState(false);
-  const [generatedImage, setGeneratedImage] = useState<string | null>(null);
+  const [generatedImage, setGeneratedImage] = useState<{ url: string; id: string } | null>(null);
   const [showMinter, setShowMinter] = useState(false);
 
-  const handleImageGenerated = (imageUrl: string) => {
-    setGeneratedImage(imageUrl);
+  const handleImageGenerated = (imageUrl: string, imageId: string) => {
+    setGeneratedImage({ url: imageUrl, id: imageId });
     setShowMinter(true);
   };
 
@@ -151,7 +151,8 @@ export default function Home() {
                 
                 {generatedImage && (
                   <NFTMinter
-                    imageUrl={generatedImage}
+                    imageUrl={generatedImage.url}
+                    imageId={generatedImage.id}
                     onClose={() => setGeneratedImage(null)}
                     onSuccess={() => {
                       toast.success('NFT minted successfully!');
